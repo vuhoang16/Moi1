@@ -1,0 +1,206 @@
+import React, { useRef } from 'react';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useAuthStore } from '../store/auth.store';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
+// Auth screens
+import LoginScreen from '../screens/auth/LoginScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
+import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
+
+// Landlord screens
+import LandlordHomeScreen from '../screens/landlord/HomeScreen';
+import PropertiesScreen from '../screens/landlord/PropertiesScreen';
+import PropertyDetailScreen from '../screens/landlord/PropertyDetailScreen';
+import RoomDetailScreen from '../screens/landlord/RoomDetailScreen';
+import ContractListScreen from '../screens/landlord/ContractListScreen';
+import MaintenanceListScreen from '../screens/landlord/MaintenanceListScreen';
+import ReportsScreen from '../screens/landlord/ReportsScreen';
+import CreatePropertyScreen from '../screens/landlord/CreatePropertyScreen';
+import CreateRoomScreen from '../screens/landlord/CreateRoomScreen';
+import CreateContractScreen from '../screens/landlord/CreateContract';
+import CreateChecklistScreen from '../screens/landlord/CreateChecklistScreen';
+import CreateInvoiceScreen from '../screens/landlord/CreateInvoiceScreen';
+import DepositDetailScreen from '../screens/landlord/DepositDetailScreen';
+
+// Tenant screens
+import TenantHomeScreen from '../screens/tenant/HomeScreen';
+import MaintenanceScreen from '../screens/tenant/MaintenanceScreen';
+import SubmitMaintenanceScreen from '../screens/tenant/SubmitMaintenanceScreen';
+
+// Shared screens
+import InvoiceListScreen from '../screens/shared/InvoiceListScreen';
+import InvoiceDetailScreen from '../screens/shared/InvoiceDetailScreen';
+import ContractDetailScreen from '../screens/shared/ContractDetailScreen';
+import ChecklistScreen from '../screens/shared/ChecklistScreen';
+import MaintenanceDetailScreen from '../screens/shared/MaintenanceDetailScreen';
+import ChatListScreen from '../screens/shared/ChatListScreen';
+import ChatScreen from '../screens/shared/ChatScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import PDFViewerScreen from '../screens/shared/PDFViewerScreen';
+
+export type RootStackParamList = {
+  Auth: undefined;
+  LandlordApp: undefined;
+  TenantApp: undefined;
+};
+
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  RoleSelection: undefined;
+};
+
+export type LandlordTabParamList = {
+  Home: undefined;
+  Properties: undefined;
+  Contracts: undefined;
+  Reports: undefined;
+  Chat: undefined;
+};
+
+export type TenantTabParamList = {
+  Home: undefined;
+  Invoices: undefined;
+  Maintenance: undefined;
+  Chat: undefined;
+};
+
+export type LandlordStackParamList = {
+  LandlordTabs: undefined;
+  PropertyDetail: { id: string };
+  RoomDetail: { id: string; propertyId: string };
+  CreateProperty: undefined;
+  CreateRoom: { propertyId: string };
+  ContractDetail: { contractId: string };
+  CreateContract: undefined;
+  CreateInvoice: { contractId: string };
+  DepositDetail: { contractId: string };
+  InvoiceDetail: { invoiceId: string };
+  InvoiceList: { contractId?: string; roomId?: string };
+  MaintenanceDetail: { id: string };
+  ChecklistScreen: { id: string };
+  CreateChecklist: { contractId: string; phase: 'ban_giao' | 'tra_phong' };
+  ChatScreen: { conversationId: string };
+  Notifications: undefined;
+  PDFViewer: { url: string };
+};
+
+export type TenantStackParamList = {
+  TenantTabs: undefined;
+  InvoiceDetail: { id: string };
+  ContractDetail: { id: string };
+  MaintenanceDetail: { id: string };
+  SubmitMaintenance: undefined;
+  ChatScreen: { conversationId: string };
+  Notifications: undefined;
+  PDFViewer: { url: string };
+};
+
+const RootStack = createNativeStackNavigator<RootStackParamList>();
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const LandlordTab = createBottomTabNavigator<LandlordTabParamList>();
+const TenantTab = createBottomTabNavigator<TenantTabParamList>();
+const LandlordStack = createNativeStackNavigator<LandlordStackParamList>();
+const TenantStack = createNativeStackNavigator<TenantStackParamList>();
+
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="RoleSelection" component={RoleSelectionScreen} />
+    </AuthStack.Navigator>
+  );
+}
+
+function LandlordTabNavigator() {
+  return (
+    <LandlordTab.Navigator screenOptions={{ headerShown: false }}>
+      <LandlordTab.Screen name="Home" component={LandlordHomeScreen} options={{ title: 'Tổng quan' }} />
+      <LandlordTab.Screen name="Properties" component={PropertiesScreen} options={{ title: 'Bất động sản' }} />
+      <LandlordTab.Screen name="Contracts" component={ContractListScreen} options={{ title: 'Hợp đồng' }} />
+      <LandlordTab.Screen name="Reports" component={ReportsScreen} options={{ title: 'Báo cáo' }} />
+      <LandlordTab.Screen name="Chat" component={ChatListScreen} options={{ title: 'Tin nhắn' }} />
+    </LandlordTab.Navigator>
+  );
+}
+
+function TenantTabNavigator() {
+  return (
+    <TenantTab.Navigator screenOptions={{ headerShown: false }}>
+      <TenantTab.Screen name="Home" component={TenantHomeScreen} options={{ title: 'Trang chủ' }} />
+      <TenantTab.Screen name="Invoices" component={InvoiceListScreen} options={{ title: 'Hóa đơn' }} />
+      <TenantTab.Screen name="Maintenance" component={MaintenanceScreen} options={{ title: 'Bảo trì' }} />
+      <TenantTab.Screen name="Chat" component={ChatListScreen} options={{ title: 'Tin nhắn' }} />
+    </TenantTab.Navigator>
+  );
+}
+
+function LandlordNavigator() {
+  return (
+    <LandlordStack.Navigator>
+      <LandlordStack.Screen name="LandlordTabs" component={LandlordTabNavigator} options={{ headerShown: false }} />
+      <LandlordStack.Screen name="PropertyDetail" component={PropertyDetailScreen} options={{ title: 'Chi tiết bất động sản' }} />
+      <LandlordStack.Screen name="RoomDetail" component={RoomDetailScreen} options={{ title: 'Chi tiết phòng' }} />
+      <LandlordStack.Screen name="CreateProperty" component={CreatePropertyScreen} options={{ title: 'Thêm bất động sản' }} />
+      <LandlordStack.Screen name="CreateRoom" component={CreateRoomScreen} options={{ title: 'Thêm phòng' }} />
+      <LandlordStack.Screen name="ContractDetail" component={ContractDetailScreen} options={{ title: 'Hợp đồng' }} />
+      <LandlordStack.Screen name="CreateContract" component={CreateContractScreen} options={{ title: 'Tạo hợp đồng', headerShown: false }} />
+      <LandlordStack.Screen name="CreateInvoice" component={CreateInvoiceScreen} options={{ title: 'Tạo hóa đơn' }} />
+      <LandlordStack.Screen name="DepositDetail" component={DepositDetailScreen} options={{ title: 'Chi tiết tiền cọc' }} />
+      <LandlordStack.Screen name="InvoiceDetail" component={InvoiceDetailScreen} options={{ title: 'Hóa đơn' }} />
+      <LandlordStack.Screen name="InvoiceList" component={InvoiceListScreen} options={{ title: 'Danh sách hóa đơn' }} />
+      <LandlordStack.Screen name="MaintenanceDetail" component={MaintenanceDetailScreen} options={{ title: 'Yêu cầu bảo trì' }} />
+      <LandlordStack.Screen name="ChecklistScreen" component={ChecklistScreen} options={{ title: 'Bàn giao / Trả phòng' }} />
+      <LandlordStack.Screen name="CreateChecklist" component={CreateChecklistScreen} options={{ title: 'Tạo checklist' }} />
+      <LandlordStack.Screen name="ChatScreen" component={ChatScreen} options={{ title: 'Tin nhắn' }} />
+      <LandlordStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Thông báo' }} />
+      <LandlordStack.Screen name="PDFViewer" component={PDFViewerScreen} options={{ title: 'Xem tài liệu' }} />
+    </LandlordStack.Navigator>
+  );
+}
+
+function TenantNavigator() {
+  return (
+    <TenantStack.Navigator>
+      <TenantStack.Screen name="TenantTabs" component={TenantTabNavigator} options={{ headerShown: false }} />
+      <TenantStack.Screen name="InvoiceDetail" component={InvoiceDetailScreen} options={{ title: 'Hóa đơn' }} />
+      <TenantStack.Screen name="ContractDetail" component={ContractDetailScreen} options={{ title: 'Hợp đồng' }} />
+      <TenantStack.Screen name="MaintenanceDetail" component={MaintenanceDetailScreen} options={{ title: 'Yêu cầu bảo trì' }} />
+      <TenantStack.Screen name="SubmitMaintenance" component={SubmitMaintenanceScreen} options={{ title: 'Gửi yêu cầu bảo trì' }} />
+      <TenantStack.Screen name="ChatScreen" component={ChatScreen} options={{ title: 'Tin nhắn' }} />
+      <TenantStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Thông báo' }} />
+      <TenantStack.Screen name="PDFViewer" component={PDFViewerScreen} options={{ title: 'Xem tài liệu' }} />
+    </TenantStack.Navigator>
+  );
+}
+
+function AppWithPush() {
+  const { user } = useAuthStore();
+  const navRef = useRef<NavigationContainerRef<any>>(null);
+
+  const navigate = (screen: string, params?: any) => {
+    navRef.current?.navigate(screen as any, params);
+  };
+
+  usePushNotifications(navigate);
+
+  return (
+    <NavigationContainer ref={navRef}>
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {!user ? (
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
+        ) : user.role === 'chu_nha' ? (
+          <RootStack.Screen name="LandlordApp" component={LandlordNavigator} />
+        ) : (
+          <RootStack.Screen name="TenantApp" component={TenantNavigator} />
+        )}
+      </RootStack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default AppWithPush;

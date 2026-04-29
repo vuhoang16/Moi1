@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_DIRECT")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  fullName    String   @map("full_name")
+  phone       String
+  role        UserRole
+  avatarUrl   String?  @map("avatar_url")
+  fcmTokens   String[] @map("fcm_tokens")
+  isVerified  Boolean  @default(false) @map("is_verified")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  propertiesOwned      Property[]         @relation("LandlordProperties")
+  contractsAsLandlord  Contract[]         @relation("LandlordContracts")
+  contractsAsTenant    Contract[]         @relation("TenantContracts")
+  notifications        Notification[]
+  sentMessages         ChatMessage[]
+  maintenanceTickets   MaintenanceTicket[] @relation("TenantTickets")
+
+  @@map("users")
+}
+
+enum UserRole {
+  chu_nha
+  nguoi_thue
+
+  @@map("user_role")
+}
+
+model Property {
+  id               String   @id @default(uuid())
+  landlordId       String   @map("landlord_id")
+  name             String
+  address          String
+  ward             String
+  district         String
+  city             String
+  description      String?
+  imageUrls        String[] @map("image_urls")
+  electricityRate  Float    @map("electricity_rate")
+  waterRate        Float    @map("water_rate")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  landlord  User   @relation("LandlordProperties", fields: [landlordId], references: [id])
+  rooms     Room[]
+
+  @@index([landlordId])
+  @@map("properties")
+}
+
+model Room {
+  id                String     @id @default(uuid())
+  propertyId        String     @map("property_id")
+  roomNumber        String     @map("room_number")
+  floor             Int?
+  area              Float
+  baseRent          Float      @map("base_rent")
+  maxOccupants      Int        @default(2) @map("max_occupants")
+  status            RoomStatus @default(trong)
+  amenities         String[]
+  imageUrls         String[]   @map("image_urls")
+  notes             String?
+  currentContractId String?    @unique @map("current_contract_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  property   Property           @relation(fields: [propertyId], references: [id])
+  contracts  Contract[]
+  invoices   Invoice[]
+  tickets    MaintenanceTicket[]
+  checklists Checklist[]
+
+  @@unique([propertyId, roomNumber])
+  @@index([propertyId])
+  @@index([status])
+  @@map("rooms")
+}
+
+enum RoomStatus {
+  trong
+  da_thue
+  dang_sua_chua
+
+  @@map("room_status")
+}
+
+model Contract {
+  id                      String         @id @default(uuid())
+  roomId                  String         @map("room_id")
+  landlordId              String         @map("landlord_id")
+  tenantId                String         @map("tenant_id")
+  startDate               DateTime       @map("start_date") @db.Date
+  endDate                 DateTime       @map("end_date") @db.Date
+  monthlyRent             Float          @map("monthly_rent")
+  depositAmount           Float          @map("deposit_amount")
+  paymentDueDay           Int            @map("payment_due_day")
+  electricityStartReading Float          @map("electricity_start_reading")
+  waterStartReading       Float          @map("water_start_reading")
+  terms                   String
+  status                  ContractStatus @default(nhap)
+  pdfUrl                  String?        @map("pdf_url")
+  landlordSignatureUrl    String?        @map("landlord_signature_url")
+  tenantSignatureUrl      String?        @map("tenant_signature_url")
+  landlordSignedAt        DateTime?      @map("landlord_signed_at")
+  tenantSignedAt          DateTime?      @map("tenant_signed_at")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  room         Room               @relation(fields: [roomId], references: [id])
+  landlord     User               @relation("LandlordContracts", fields: [landlordId], references: [id])
+  tenant       User               @relation("TenantContracts", fields: [tenantId], references: [id])
+  invoices     Invoice[]
+  deposit      Deposit?
+  checklists   Checklist[]
+  tickets      MaintenanceTicket[]
+  conversation ChatConversation?
+
+  @@index([roomId])
+  @@index([landlordId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([endDate])
+  @@map("contracts")
+}
+
+enum ContractStatus {
+  nhap
+  cho_ky
+  hieu_luc
+  het_han
+  da_huy
+
+  @@map("contract_status")
+}
+
+model Invoice {
+  id                        String        @id @default(uuid())
+  contractId                String        @map("contract_id")
+  roomId                    String        @map("room_id")
+  tenantId                  String        @map("tenant_id")
+  landlordId                String        @map("landlord_id")
+  billingMonth              String        @map("billing_month")
+  dueDate                   DateTime      @map("due_date") @db.Date
+  baseRent                  Float         @map("base_rent")
+  electricityPrevReading    Float         @map("electricity_prev_reading")
+  electricityCurrentReading Float         @map("electricity_current_reading")
+  electricityUsage          Float         @map("electricity_usage")
+  electricityAmount         Float         @map("electricity_amount")
+  waterPrevReading          Float         @map("water_prev_reading")
+  waterCurrentReading       Float         @map("water_current_reading")
+  waterUsage                Float         @map("water_usage")
+  waterAmount               Float         @map("water_amount")
+  otherFees                 Json          @default("[]") @map("other_fees")
+  totalAmount               Float         @map("total_amount")
+  status                    InvoiceStatus @default(chua_thanh_toan)
+  paidAt                    DateTime?     @map("paid_at")
+  notes                     String?
+  createdAt                 DateTime      @default(now()) @map("created_at")
+  updatedAt                 DateTime      @updatedAt @map("updated_at")
+
+  contract  Contract  @relation(fields: [contractId], references: [id])
+  room      Room      @relation(fields: [roomId], references: [id])
+  payments  Payment[]
+
+  @@unique([contractId, billingMonth])
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  chua_thanh_toan
+  da_thanh_toan
+  qua_han
+
+  @@map("invoice_status")
+}
+
+model Payment {
+  id                   String        @id @default(uuid())
+  invoiceId            String        @map("invoice_id")
+  contractId           String        @map("contract_id")
+  tenantId             String        @map("tenant_id")
+  landlordId           String        @map("landlord_id")
+  amount               Float
+  method               PaymentMethod
+  status               PaymentStatus @default(cho_xu_ly)
+  gatewayTransactionId String?       @map("gateway_transaction_id")
+  gatewayOrderId       String        @unique @map("gateway_order_id")
+  gatewayResponse      Json?         @map("gateway_response")
+  paidAt               DateTime?     @map("paid_at")
+  failureReason        String?       @map("failure_reason")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([gatewayOrderId])
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  momo
+  zalopay
+  vietqr
+  tien_mat
+
+  @@map("payment_method")
+}
+
+enum PaymentStatus {
+  cho_xu_ly
+  thanh_cong
+  that_bai
+  hoan_tien
+
+  @@map("payment_status")
+}
+
+model Deposit {
+  id                      String        @id @default(uuid())
+  contractId              String        @unique @map("contract_id")
+  tenantId                String        @map("tenant_id")
+  landlordId              String        @map("landlord_id")
+  amount                  Float
+  status                  DepositStatus @default(dang_giu)
+  collectedAt             DateTime?     @map("collected_at")
+  collectionMethod        String?       @map("collection_method")
+  collectionTransactionId String?       @map("collection_transaction_id")
+  refundedAt              DateTime?     @map("refunded_at")
+  refundMethod            String?       @map("refund_method")
+  refundTransactionId     String?       @map("refund_transaction_id")
+  deductedAmount          Float         @default(0) @map("deducted_amount")
+  deductionReason         String?       @map("deduction_reason")
+  notes                   String?
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  contract  Contract  @relation(fields: [contractId], references: [id])
+
+  @@map("deposits")
+}
+
+enum DepositStatus {
+  dang_giu
+  da_hoan
+  da_tru_mot_phan
+
+  @@map("deposit_status")
+}
+
+model Checklist {
+  id                    String    @id @default(uuid())
+  contractId            String    @map("contract_id")
+  roomId                String    @map("room_id")
+  phase                 ChecklistPhase
+  confirmedByTenantAt   DateTime? @map("confirmed_by_tenant_at")
+  confirmedByLandlordAt DateTime? @map("confirmed_by_landlord_at")
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  contract  Contract        @relation(fields: [contractId], references: [id])
+  room      Room            @relation(fields: [roomId], references: [id])
+  records   ChecklistRecord[]
+
+  @@unique([contractId, phase])
+  @@map("checklists")
+}
+
+enum ChecklistPhase {
+  ban_giao
+  tra_phong
+
+  @@map("checklist_phase")
+}
+
+model ChecklistRecord {
+  id                  String  @id @default(uuid())
+  checklistId         String  @map("checklist_id")
+  name                String
+  category            String
+  quantity            Int     @default(1)
+  conditionOnCheckin  String? @map("condition_on_checkin")
+  conditionOnCheckout String? @map("condition_on_checkout")
+  landlordNote        String? @map("landlord_note")
+  tenantNote          String? @map("tenant_note")
+  photoUrls           String[] @map("photo_urls")
+
+  checklist  Checklist  @relation(fields: [checklistId], references: [id])
+
+  @@index([checklistId])
+  @@map("checklist_records")
+}
+
+model MaintenanceTicket {
+  id             String            @id @default(uuid())
+  contractId     String            @map("contract_id")
+  roomId         String            @map("room_id")
+  propertyId     String            @map("property_id")
+  tenantId       String            @map("tenant_id")
+  landlordId     String            @map("landlord_id")
+  title          String
+  description    String
+  mediaUrls      String[]          @map("media_urls")
+  status         MaintenanceStatus @default(cho_xu_ly)
+  priority       MaintenancePriority @default(trung_binh)
+  assignedWorker String?           @map("assigned_worker")
+  workerPhone    String?           @map("worker_phone")
+  scheduledAt    DateTime?         @map("scheduled_at")
+  resolvedAt     DateTime?         @map("resolved_at")
+  tenantRating   Int?              @map("tenant_rating")
+  tenantFeedback String?           @map("tenant_feedback")
+  statusHistory  Json              @default("[]") @map("status_history")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  contract  Contract  @relation(fields: [contractId], references: [id])
+  room      Room      @relation(fields: [roomId], references: [id])
+  tenant    User      @relation("TenantTickets", fields: [tenantId], references: [id])
+
+  @@index([contractId])
+  @@index([landlordId])
+  @@index([status])
+  @@map("maintenance_tickets")
+}
+
+enum MaintenanceStatus {
+  cho_xu_ly
+  dang_xu_ly
+  da_giao_tho
+  hoan_thanh
+  da_huy
+
+  @@map("maintenance_status")
+}
+
+enum MaintenancePriority {
+  thap
+  trung_binh
+  cao
+  khan_cap
+
+  @@map("maintenance_priority")
+}
+
+model Notification {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  type              String
+  title             String
+  body              String
+  data              Json     @default("{}")
+  isRead            Boolean  @default(false) @map("is_read")
+  readAt            DateTime? @map("read_at")
+  relatedEntityType String?  @map("related_entity_type")
+  relatedEntityId   String?  @map("related_entity_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model ChatConversation {
+  id                  String    @id @default(uuid())
+  contractId          String    @unique @map("contract_id")
+  landlordId          String    @map("landlord_id")
+  tenantId            String    @map("tenant_id")
+  lastMessageId       String?   @map("last_message_id")
+  lastMessageAt       DateTime? @map("last_message_at")
+  landlordUnreadCount Int       @default(0) @map("landlord_unread_count")
+  tenantUnreadCount   Int       @default(0) @map("tenant_unread_count")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  contract  Contract      @relation(fields: [contractId], references: [id])
+  messages  ChatMessage[]
+
+  @@index([landlordId])
+  @@index([tenantId])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String    @id @default(uuid())
+  conversationId String    @map("conversation_id")
+  senderId       String    @map("sender_id")
+  text           String?
+  imageUrl       String?   @map("image_url")
+  isRead         Boolean   @default(false) @map("is_read")
+  readAt         DateTime? @map("read_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  conversation  ChatConversation  @relation(fields: [conversationId], references: [id])
+  sender        User              @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
+}

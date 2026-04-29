@@ -1,0 +1,37 @@
+# Railway project config
+# Docs: https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "pnpm install --frozen-lockfile && pnpm prisma generate && pnpm build"
+
+[deploy]
+startCommand = "pnpm prisma migrate deploy && pnpm start:prod"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "rentapp-api"
+source = "apps/api"
+
+  [services.env]
+  PORT = "3000"
+  NODE_ENV = "production"
+
+[[services]]
+name = "rentapp-pdf-worker"
+source = "apps/api"
+
+  [services.build]
+  buildCommand = "pnpm install --frozen-lockfile && pnpm prisma generate && pnpm build"
+
+  [services.deploy]
+  startCommand = "node dist/workers/pdf.worker.js"
+  # Puppeteer needs more memory
+  # Set in Railway dashboard: Memory = 512MB minimum
+
+  [services.env]
+  NODE_ENV = "production"
+  WORKER_MODE = "pdf"

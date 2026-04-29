@@ -1,0 +1,10 @@
+appId: com.rentapp.vn
+---
+- launchApp
+- assertVisible: "Chào mừng trở lại"
+- tapOn: "Email"
+- inputText: "landlord@example.com"
+- tapOn: "Mật khẩu"
+- inputText: "123456"
+- tapOn: "Đăng nhập"
+- assertVisible: "Danh sách Toà nhà"
