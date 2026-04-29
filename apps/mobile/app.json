@@ -5,13 +5,7 @@
     "version": "1.0.0",
     "scheme": "rentapp",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1B4F72"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rentapp.vn",
@@ -23,10 +17,6 @@
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1B4F72"
-      },
       "package": "com.rentapp.vn",
       "versionCode": 1,
       "permissions": [
@@ -35,8 +25,12 @@
         "WRITE_EXTERNAL_STORAGE",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
-      ],
-      "googleServicesFile": "./google-services.json"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b688848e-1840-42bf-a66b-17d1d1900e2d"
+      }
     },
     "plugins": [
       "@react-native-firebase/app",
