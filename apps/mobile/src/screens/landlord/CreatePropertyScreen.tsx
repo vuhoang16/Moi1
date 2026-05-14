@@ -98,6 +98,7 @@ export default function CreatePropertyScreen({ navigation }: any) {
                 multiline
                 numberOfLines={3}
                 style={styles.input}
+                placeholder="VD: Sleepbox cao cấp mới 100%, có thang máy. Gần trường đại học, cách chợ 500m. Cửa khoá riêng tư, đầy đủ tiện nghi."
               />
             )}
           />

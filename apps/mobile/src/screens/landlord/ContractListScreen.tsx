@@ -50,7 +50,7 @@ export default function ContractListScreen({ navigation }: any) {
           }
         />
       )}
-      <FAB icon="plus" style={styles.fab} onPress={() => navigation.navigate('CreateContract')} />
+      <FAB icon="plus" style={styles.fab} testID="create-contract-fab" accessibilityLabel="Tạo hợp đồng mới" onPress={() => navigation.navigate('CreateContract')} />
     </SafeAreaView>
   );
 }

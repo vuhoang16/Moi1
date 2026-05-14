@@ -7,6 +7,27 @@ const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
 );
 
+async function compressAndUpload(uri: string, bucket: string, folder: string): Promise<string> {
+  const compressed = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1280 } }],
+    { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG },
+  );
+
+  const response = await fetch(compressed.uri);
+  const blob = await response.blob();
+  const path = `${folder}/${Date.now()}.jpg`;
+
+  const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+    contentType: 'image/jpeg',
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function pickAndUploadImage(bucket: string, folder: string): Promise<string | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) return null;
@@ -18,26 +39,21 @@ export async function pickAndUploadImage(bucket: string, folder: string): Promis
   });
   if (result.canceled) return null;
 
-  const asset = result.assets[0];
-  const compressed = await ImageManipulator.manipulateAsync(
-    asset.uri,
-    [{ resize: { width: 1280 } }],
-    { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG },
-  );
+  return compressAndUpload(result.assets[0].uri, bucket, folder);
+}
 
-  const response = await fetch(compressed.uri);
-  const blob = await response.blob();
-  const ext = 'jpg';
-  const path = `${folder}/${Date.now()}.${ext}`;
+export async function takePhotoAndUpload(bucket: string, folder: string): Promise<string | null> {
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) return null;
 
-  const { error } = await supabase.storage.from(bucket).upload(path, blob, {
-    contentType: 'image/jpeg',
-    upsert: false,
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.8,
+    allowsEditing: true,
   });
-  if (error) throw new Error(error.message);
+  if (result.canceled) return null;
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
+  return compressAndUpload(result.assets[0].uri, bucket, folder);
 }
 
 export async function pickAndUploadVideo(bucket: string, folder: string): Promise<string | null> {

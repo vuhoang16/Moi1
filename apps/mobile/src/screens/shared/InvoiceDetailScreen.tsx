@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking } from 'react-native';
+import { ScrollView, StyleSheet, View, Alert, Linking, Image } from 'react-native';
 import { Text, Card, Button, Chip, RadioButton, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
 import { useInvoice, useInitiatePayment } from '../../queries/invoices';
 import { useAuthStore } from '../../store/auth.store';
+import { usePaymentReturn } from '../../hooks/usePaymentReturn';
 import { theme, spacing, typography } from '../../theme';
 import type { InvoiceStatus } from '@rentapp/shared';
 
 type PaymentMethod = 'momo' | 'zalopay' | 'vietqr';
 
-const statusColors: Record<InvoiceStatus, string> = {
+interface QRData {
+  qrCodeUrl: string;
+  transferRef: string;
+  amount: number;
+}
+
+const STATUS_COLOR: Record<InvoiceStatus, string> = {
   chua_thanh_toan: '#E67E22',
   da_thanh_toan: '#27AE60',
   qua_han: '#C0392B',
 };
-const statusLabels: Record<InvoiceStatus, string> = {
+const STATUS_LABEL: Record<InvoiceStatus, string> = {
   chua_thanh_toan: 'Chưa thanh toán',
   da_thanh_toan: 'Đã thanh toán',
   qua_han: 'Quá hạn',
@@ -28,13 +34,15 @@ export default function InvoiceDetailScreen({ route }: any) {
   const { data: invoice, isLoading, refetch } = useInvoice(id);
   const initiatePayment = useInitiatePayment();
   const [method, setMethod] = useState<PaymentMethod>('momo');
-  const [qrData, setQrData] = useState<{ qrCodeUrl?: string; deeplink?: string; payUrl?: string } | null>(null);
+  const [qrData, setQrData] = useState<QRData | null>(null);
+  const { paymentReturnStatus, clearPaymentReturnStatus } = usePaymentReturn();
 
   if (isLoading) return <ActivityIndicator style={{ flex: 1 }} />;
   if (!invoice) return null;
 
   const money = (n: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
+
   const isTenant = user?.id === invoice.tenantId;
   const canPay = isTenant && invoice.status !== 'da_thanh_toan';
 
@@ -42,7 +50,11 @@ export default function InvoiceDetailScreen({ route }: any) {
     try {
       const result = await initiatePayment.mutateAsync({ invoiceId: id, method });
       if (method === 'vietqr' && result.qrCodeUrl) {
-        setQrData({ qrCodeUrl: result.qrCodeUrl });
+        setQrData({
+          qrCodeUrl: result.qrCodeUrl,
+          transferRef: result.payment?.gatewayOrderId ?? '',
+          amount: invoice.totalAmount,
+        });
       } else if (result.deeplink) {
         await Linking.openURL(result.deeplink);
       } else if (result.payUrl) {
@@ -58,13 +70,36 @@ export default function InvoiceDetailScreen({ route }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+
+        {/* Payment return banner */}
+        {paymentReturnStatus && (
+          <Card
+            style={[
+              styles.card,
+              { backgroundColor: paymentReturnStatus === 'success' ? '#D5F5E3' : '#FDEBD0' },
+            ]}
+          >
+            <Card.Content style={styles.returnBanner}>
+              <Text style={styles.returnIcon}>
+                {paymentReturnStatus === 'success' ? '✅' : '❌'}
+              </Text>
+              <Text style={styles.returnText}>
+                {paymentReturnStatus === 'success'
+                  ? 'Thanh toán thành công! Hóa đơn đang được cập nhật.'
+                  : 'Giao dịch không thành công. Vui lòng thử lại.'}
+              </Text>
+              <Button compact onPress={clearPaymentReturnStatus}>Đóng</Button>
+            </Card.Content>
+          </Card>
+        )}
+
         <View style={styles.titleRow}>
           <Text style={styles.title}>Hóa đơn {invoice.billingMonth}</Text>
           <Chip
-            style={{ backgroundColor: statusColors[invoice.status as InvoiceStatus] + '22' }}
-            textStyle={{ color: statusColors[invoice.status as InvoiceStatus] }}
+            style={{ backgroundColor: STATUS_COLOR[invoice.status as InvoiceStatus] + '22' }}
+            textStyle={{ color: STATUS_COLOR[invoice.status as InvoiceStatus] }}
           >
-            {statusLabels[invoice.status as InvoiceStatus]}
+            {STATUS_LABEL[invoice.status as InvoiceStatus]}
           </Chip>
         </View>
 
@@ -87,7 +122,10 @@ export default function InvoiceDetailScreen({ route }: any) {
             <Row label="Tổng cộng" value={money(invoice.totalAmount)} bold />
             <Row label="Hạn thanh toán" value={dayjs(invoice.dueDate).format('DD/MM/YYYY')} />
             {invoice.paidAt && (
-              <Row label="Đã thanh toán lúc" value={dayjs(invoice.paidAt).format('DD/MM/YYYY HH:mm')} />
+              <Row
+                label="Đã thanh toán lúc"
+                value={dayjs(invoice.paidAt).format('DD/MM/YYYY HH:mm')}
+              />
             )}
           </Card.Content>
         </Card>
@@ -102,22 +140,27 @@ export default function InvoiceDetailScreen({ route }: any) {
           </Card.Content>
         </Card>
 
+        {/* Payment method selector */}
         {canPay && !qrData && (
           <Card style={styles.card}>
             <Card.Title title="Chọn phương thức thanh toán" />
             <Card.Content>
-              {([
-                { value: 'momo', label: 'MoMo' },
-                { value: 'zalopay', label: 'ZaloPay' },
-                { value: 'vietqr', label: 'VietQR (chuyển khoản)' },
-              ] as { value: PaymentMethod; label: string }[]).map(({ value, label }) => (
+              {(
+                [
+                  { value: 'momo', label: 'MoMo' },
+                  { value: 'zalopay', label: 'ZaloPay' },
+                  { value: 'vietqr', label: 'VietQR (chuyển khoản)' },
+                ] as { value: PaymentMethod; label: string }[]
+              ).map(({ value, label }) => (
                 <View key={value} style={styles.radioRow}>
                   <RadioButton
                     value={value}
                     status={method === value ? 'checked' : 'unchecked'}
                     onPress={() => setMethod(value)}
                   />
-                  <Text style={styles.radioLabel} onPress={() => setMethod(value)}>{label}</Text>
+                  <Text style={styles.radioLabel} onPress={() => setMethod(value)}>
+                    {label}
+                  </Text>
                 </View>
               ))}
             </Card.Content>
@@ -134,15 +177,34 @@ export default function InvoiceDetailScreen({ route }: any) {
           </Card>
         )}
 
-        {qrData?.qrCodeUrl && (
+        {/* VietQR display */}
+        {qrData && (
           <Card style={styles.card}>
             <Card.Title title="Quét mã VietQR để chuyển khoản" />
             <Card.Content style={styles.qrContainer}>
-              <QRCode value={qrData.qrCodeUrl} size={220} />
+              <Image
+                source={{ uri: qrData.qrCodeUrl }}
+                style={styles.qrImage}
+                resizeMode="contain"
+              />
+              <Text style={styles.qrAmount}>{money(qrData.amount)}</Text>
+              {!!qrData.transferRef && (
+                <View style={styles.transferRefBox}>
+                  <Text style={styles.transferRefLabel}>Nội dung chuyển khoản</Text>
+                  <Text style={styles.transferRefValue}>{qrData.transferRef}</Text>
+                </View>
+              )}
               <Text style={styles.qrHint}>
-                Mở app ngân hàng → Quét mã QR → Kiểm tra số tiền → Xác nhận
+                Mở app ngân hàng → Quét mã QR → Kiểm tra thông tin → Xác nhận
               </Text>
-              <Button onPress={() => { setQrData(null); refetch(); }} style={{ marginTop: spacing.md }}>
+              <Button
+                mode="contained-tonal"
+                onPress={() => {
+                  setQrData(null);
+                  refetch();
+                }}
+                style={{ marginTop: spacing.md }}
+              >
                 Đã chuyển khoản xong
               </Button>
             </Card.Content>
@@ -172,12 +234,64 @@ const rowStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: spacing.lg, gap: spacing.md },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  // Return banner
+  returnBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  returnIcon: { fontSize: 20 },
+  returnText: { ...typography.body, flex: 1 },
+
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   title: { ...typography.headingLarge },
   card: { borderRadius: 12 },
-  divider: { height: 1, backgroundColor: theme.colors.surfaceVariant, marginVertical: spacing.sm },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.surfaceVariant,
+    marginVertical: spacing.sm,
+  },
   radioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
   radioLabel: { ...typography.body, flex: 1 },
+
+  // VietQR
   qrContainer: { alignItems: 'center', paddingVertical: spacing.md },
-  qrHint: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, textAlign: 'center', marginTop: spacing.md },
+  qrImage: { width: 220, height: 220, borderRadius: 8 },
+  qrAmount: {
+    ...typography.headingMedium,
+    color: theme.colors.primary,
+    marginTop: spacing.md,
+  },
+  transferRefBox: {
+    marginTop: spacing.sm,
+    backgroundColor: theme.colors.surfaceVariant,
+    borderRadius: 8,
+    padding: spacing.sm,
+    alignItems: 'center',
+    width: '100%',
+  },
+  transferRefLabel: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+    marginBottom: 2,
+  },
+  transferRefValue: {
+    ...typography.body,
+    fontWeight: '600',
+    color: theme.colors.onSurface,
+    textAlign: 'center',
+  },
+  qrHint: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    lineHeight: 18,
+  },
 });

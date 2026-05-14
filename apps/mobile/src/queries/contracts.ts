@@ -22,6 +22,25 @@ export function useContract(id: string) {
   });
 }
 
+export function useCreateContract() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      roomId: string;
+      tenantId: string;
+      startDate: string;
+      endDate: string;
+      monthlyRent: number;
+      depositAmount: number;
+      paymentDueDay: number;
+      electricityStartReading: number;
+      waterStartReading: number;
+      terms: string;
+    }) => api.post('/contracts', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: contractKeys.all }),
+  });
+}
+
 export function useSignContract() {
   const qc = useQueryClient();
   return useMutation({

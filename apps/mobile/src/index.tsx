@@ -2,11 +2,14 @@ import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
+import { registerRootComponent } from 'expo';
 import AppNavigator from './navigation';
 import { theme } from './theme';
 import { useAuthStore } from './store/auth.store';
 
-import { registerRootComponent } from 'expo';
+// Keep splash visible while auth state loads
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,7 +24,9 @@ export default function App() {
   const loadStoredAuth = useAuthStore((s) => s.loadStoredAuth);
 
   useEffect(() => {
-    loadStoredAuth();
+    loadStoredAuth().finally(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    });
   }, []);
 
   return (

@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Snackbar } from 'react-native-paper';
 import { useAuthStore } from '../store/auth.store';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
@@ -181,26 +182,72 @@ function TenantNavigator() {
 function AppWithPush() {
   const { user } = useAuthStore();
   const navRef = useRef<NavigationContainerRef<any>>(null);
+  const navReady = useRef(false);
 
   const navigate = (screen: string, params?: any) => {
-    navRef.current?.navigate(screen as any, params);
+    if (navReady.current) navRef.current?.navigate(screen as any, params);
   };
 
-  usePushNotifications(navigate);
+  const { foreground, clearForeground } = usePushNotifications(navigate);
 
   return (
-    <NavigationContainer ref={navRef}>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
-          <RootStack.Screen name="Auth" component={AuthNavigator} />
-        ) : user.role === 'chu_nha' ? (
-          <RootStack.Screen name="LandlordApp" component={LandlordNavigator} />
-        ) : (
-          <RootStack.Screen name="TenantApp" component={TenantNavigator} />
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer
+        ref={navRef}
+        onReady={() => { navReady.current = true; }}
+      >
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          {!user ? (
+            <RootStack.Screen name="Auth" component={AuthNavigator} />
+          ) : user.role === 'chu_nha' ? (
+            <RootStack.Screen name="LandlordApp" component={LandlordNavigator} />
+          ) : (
+            <RootStack.Screen name="TenantApp" component={TenantNavigator} />
+          )}
+        </RootStack.Navigator>
+      </NavigationContainer>
+
+      <Snackbar
+        visible={!!foreground}
+        onDismiss={clearForeground}
+        duration={4000}
+        action={
+          foreground?.data
+            ? {
+                label: 'Xem',
+                onPress: () => {
+                  clearForeground();
+                  handleTapFromSnackbar(foreground.data!, navigate);
+                },
+              }
+            : undefined
+        }
+      >
+        {foreground ? `${foreground.title}: ${foreground.body}` : ''}
+      </Snackbar>
+    </>
   );
+}
+
+function handleTapFromSnackbar(data: Record<string, string>, navigate: (s: string, p?: any) => void) {
+  const { type, relatedEntityId } = data;
+  switch (type) {
+    case 'invoice_created':
+    case 'invoice_overdue':
+      navigate('InvoiceDetail', { id: relatedEntityId });
+      break;
+    case 'new_message':
+      navigate('ChatScreen', { conversationId: relatedEntityId });
+      break;
+    case 'maintenance_update':
+      navigate('MaintenanceDetail', { id: relatedEntityId });
+      break;
+    case 'contract_expiry_warning':
+      navigate('ContractDetail', { id: relatedEntityId });
+      break;
+    default:
+      navigate('Notifications');
+  }
 }
 
 export default AppWithPush;

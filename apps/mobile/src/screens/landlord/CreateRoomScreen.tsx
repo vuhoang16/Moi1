@@ -18,7 +18,11 @@ import ImagePickerGrid from '../../components/ImagePickerGrid';
 import { theme, spacing, typography } from '../../theme';
 import { useAuthStore } from '../../store/auth.store';
 
-const AMENITIES = ['Điều hoà', 'Nóng lạnh', 'Tủ lạnh', 'Máy giặt', 'Wifi', 'Bãi xe', 'Ban công', 'Bếp'];
+const AMENITIES = [
+  'Điều hoà', 'Nóng lạnh', 'Tủ lạnh', 'Máy giặt', 'Wifi',
+  'Bãi xe máy', 'Ban công', 'Bếp riêng', 'Toilet riêng',
+  'Thang máy', 'Khoá vân tay', 'Camera an ninh',
+];
 
 const schema = z.object({
   roomNumber: z.string().min(1, 'Nhập số phòng'),
