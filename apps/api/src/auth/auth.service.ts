@@ -29,16 +29,22 @@ export class AuthService {
     });
     if (existing) throw new ConflictException('Email đã được sử dụng');
 
-    const { data, error } = await this.supabase.auth.admin.createUser({
-      email: dto.email,
-      password: dto.password,
-      email_confirm: true,
-    });
-    if (error) throw new BadRequestException(error.message);
+    let userId = 'dummy-' + Date.now();
+    
+    // Local dev bypass
+    if (process.env.SUPABASE_URL !== 'https://dummy.supabase.co') {
+      const { data, error } = await this.supabase.auth.admin.createUser({
+        email: dto.email,
+        password: dto.password,
+        email_confirm: true,
+      });
+      if (error) throw new BadRequestException(error.message);
+      userId = data.user.id;
+    }
 
     const user = await this.prisma.user.create({
       data: {
-        id: data.user.id,
+        id: userId,
         email: dto.email,
         fullName: dto.fullName,
         phone: dto.phone,
@@ -50,6 +56,15 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    // Local dev bypass
+    if (process.env.SUPABASE_URL === 'https://dummy.supabase.co') {
+      const user = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+      if (!user) throw new UnauthorizedException('Tài khoản không tồn tại trong DB local');
+      return this.issueTokens(user.id, user.email, user.role);
+    }
+
     const { data, error } = await this.supabase.auth.signInWithPassword({
       email: dto.email,
       password: dto.password,
