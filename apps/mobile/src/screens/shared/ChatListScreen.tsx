@@ -32,7 +32,7 @@ export default function ChatListScreen({ navigation }: any) {
             return (
               <Card
                 style={styles.card}
-                onPress={() => navigation.navigate('Chat', { conversationId: item.id, other })}
+                onPress={() => navigation.navigate('ChatScreen', { conversationId: item.id })}
               >
                 <Card.Content style={styles.row}>
                   <Avatar.Text

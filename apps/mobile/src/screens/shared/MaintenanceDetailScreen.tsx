@@ -27,14 +27,27 @@ export default function MaintenanceDetailScreen({ route }: any) {
     queryFn: () => api.get(`/maintenance/${id}`).then((r) => r.data),
   });
 
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [worker, setWorker] = useState('');
   const [workerPhone, setWorkerPhone] = useState('');
   const [rating, setRating] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
 
+  // Pre-populate worker fields when ticket loads
+  React.useEffect(() => {
+    if (ticket) {
+      if (ticket.assignedWorker) setWorker(ticket.assignedWorker);
+      if (ticket.workerPhone) setWorkerPhone(ticket.workerPhone);
+    }
+  }, [ticket?.id]);
+
   const updateStatus = useMutation({
     mutationFn: (data: any) => api.patch(`/maintenance/${id}`, data).then((r) => r.data),
-    onSuccess: () => { refetch(); qc.invalidateQueries({ queryKey: ['maintenance'] }); },
+    onSuccess: () => {
+      setPendingStatus(null);
+      refetch();
+      qc.invalidateQueries({ queryKey: ['maintenance'] });
+    },
     onError: (err: any) => Alert.alert('Lỗi', err.response?.data?.message),
   });
 
@@ -76,8 +89,8 @@ export default function MaintenanceDetailScreen({ route }: any) {
             <Card.Title title="Cập nhật trạng thái" />
             <Card.Content>
               <SegmentedButtons
-                value={ticket.status}
-                onValueChange={(v) => updateStatus.mutate({ status: v })}
+                value={pendingStatus ?? ticket.status}
+                onValueChange={(v) => setPendingStatus(v)}
                 buttons={STATUS_FLOW}
               />
 
@@ -100,6 +113,7 @@ export default function MaintenanceDetailScreen({ route }: any) {
                 mode="contained"
                 loading={updateStatus.isPending}
                 onPress={() => updateStatus.mutate({
+                  ...(pendingStatus && pendingStatus !== ticket.status ? { status: pendingStatus } : {}),
                   assignedWorker: worker || undefined,
                   workerPhone: workerPhone || undefined,
                 })}
