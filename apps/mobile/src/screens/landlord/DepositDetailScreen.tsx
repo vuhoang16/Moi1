@@ -125,6 +125,28 @@ export default function DepositDetailScreen({ route, navigation }: any) {
           </Card.Content>
         </Card>
 
+        <Text style={styles.sectionHeader}>Lịch sử trạng thái</Text>
+        <Card style={[styles.card, { marginBottom: spacing.xl }]}>
+          <Card.Content>
+            {[
+              { label: 'Tạo đặt cọc', ts: deposit.createdAt },
+              { label: 'Thu tiền', ts: deposit.collectedAt },
+              { label: 'Khấu trừ', ts: deposit.deductedAt },
+              { label: 'Hoàn trả', ts: deposit.refundedAt },
+            ]
+              .filter((e) => e.ts != null)
+              .map((e, i, arr) => (
+                <View key={e.label} style={[styles.timelineRow, i < arr.length - 1 && styles.timelineRowBorder]}>
+                  <View style={[styles.timelineDot, { backgroundColor: theme.colors.primary }]} />
+                  <View style={styles.timelineTexts}>
+                    <Text style={styles.timelineLabel}>{e.label}</Text>
+                    <Text style={styles.timelineDate}>{dayjs(e.ts).format('DD/MM/YYYY HH:mm')}</Text>
+                  </View>
+                </View>
+              ))}
+          </Card.Content>
+        </Card>
+
         <View style={styles.actions}>
           {deposit.status === 'dang_giu' && (
             <Button
@@ -210,4 +232,11 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: theme.colors.surfaceVariant, marginVertical: spacing.sm },
   actions: { gap: spacing.md },
   actionBtn: { borderRadius: 12, paddingVertical: 4 },
+  sectionHeader: { ...typography.headingMedium, marginBottom: spacing.md },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
+  timelineRowBorder: { borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, marginRight: spacing.md },
+  timelineTexts: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  timelineLabel: { ...typography.body },
+  timelineDate: { ...typography.body, color: theme.colors.onSurfaceVariant },
 });
