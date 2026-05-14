@@ -1,0 +1,25 @@
+appId: com.rentapp.vn
+---
+- runFlow: helpers/login_tenant.yaml
+
+# Navigate to Bảo trì tab
+- tapOn: "Bảo trì"
+- waitForAnimationToEnd
+
+- assertVisible: "Gửi Yêu Cầu Bảo Trì"
+
+# Fill in title
+- tapOn: "Tiêu đề"
+- inputText: "Điều hoà không mát"
+
+# Fill in description
+- tapOn: "Mô tả chi tiết"
+- inputText: "Điều hoà phòng khách chạy nhưng không ra hơi lạnh, đã thử reset nhưng không được"
+
+# Submit
+- tapOn: "Gửi yêu cầu"
+- waitForAnimationToEnd
+
+# Verify success alert
+- assertVisible: "Thành công"
+- tapOn: "OK"

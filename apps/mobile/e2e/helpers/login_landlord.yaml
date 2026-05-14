@@ -1,0 +1,8 @@
+- launchApp
+- assertVisible: "Chào mừng trở lại"
+- tapOn: "Email"
+- inputText: "landlord@example.com"
+- tapOn: "Mật khẩu"
+- inputText: "Test@1234"
+- tapOn: "Đăng nhập"
+- waitForAnimationToEnd

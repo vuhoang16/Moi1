@@ -1,0 +1,79 @@
+appId: com.rentapp.vn
+---
+- runFlow: helpers/login_landlord.yaml
+
+# Navigate to Contracts tab
+- tapOn: "Hợp đồng"
+- waitForAnimationToEnd
+
+# Open CreateContract wizard via FAB
+- tapOn:
+    id: "create-contract-fab"
+- waitForAnimationToEnd
+
+# ── Step 1: Chọn phòng ────────────────────────────────────────────────────────
+- assertVisible: "Chọn phòng"
+# Select first property chip
+- tapOn:
+    index: 0
+    text: ".*"
+    regex: true
+- waitForAnimationToEnd
+# Select first available room card
+- scrollUntilVisible:
+    element: "Phòng"
+    direction: DOWN
+- tapOn:
+    index: 0
+    text: "Phòng"
+- tapOn: "Tiếp theo"
+- waitForAnimationToEnd
+
+# ── Step 2: Người thuê ────────────────────────────────────────────────────────
+- assertVisible: "Người thuê"
+- tapOn: "Tìm theo tên, email hoặc số điện thoại"
+- inputText: "tenant"
+- waitForAnimationToEnd
+- tapOn:
+    index: 0
+    text: "tenant"
+    regex: true
+- tapOn: "Tiếp theo"
+- waitForAnimationToEnd
+
+# ── Step 3: Ngày & Giá ────────────────────────────────────────────────────────
+- assertVisible: "Ngày & Giá"
+- tapOn: "Ngày bắt đầu"
+- inputText: "2025-07-01"
+- tapOn: "Ngày kết thúc"
+- inputText: "2026-07-01"
+- tapOn: "Tiền thuê / tháng"
+- inputText: "4000000"
+- tapOn: "Tiền cọc"
+- inputText: "8000000"
+- tapOn: "Ngày thanh toán hàng tháng"
+- clearText
+- inputText: "5"
+- tapOn: "Tiếp theo"
+- waitForAnimationToEnd
+
+# ── Step 4: Tiện ích ──────────────────────────────────────────────────────────
+- assertVisible: "Tiện ích"
+- tapOn: "Chỉ số điện ban đầu"
+- clearText
+- inputText: "1250"
+- tapOn: "Chỉ số nước ban đầu"
+- clearText
+- inputText: "85"
+- tapOn: "Tiếp theo"
+- waitForAnimationToEnd
+
+# ── Step 5: Xem lại & Tạo ────────────────────────────────────────────────────
+- assertVisible: "Xem lại"
+- assertVisible: "2025-07-01"
+- assertVisible: "2026-07-01"
+- tapOn: "Tạo hợp đồng"
+- waitForAnimationToEnd
+
+# Verify redirect to ContractDetail
+- assertVisible: "Hợp đồng"

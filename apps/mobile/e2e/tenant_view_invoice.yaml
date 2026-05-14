@@ -1,0 +1,22 @@
+appId: com.rentapp.vn
+---
+- runFlow: helpers/login_tenant.yaml
+
+# Navigate to Hóa đơn tab
+- tapOn: "Hóa đơn"
+- waitForAnimationToEnd
+
+# Tap first invoice in the list
+- scrollUntilVisible:
+    element: "Hóa đơn"
+    direction: DOWN
+- tapOn:
+    index: 0
+    text: "Hóa đơn"
+- waitForAnimationToEnd
+
+# Verify invoice detail screen
+- assertVisible: "Chi tiết"
+- assertVisible: "Tiền thuê"
+- assertVisible: "Tổng cộng"
+- assertVisible: "Hạn thanh toán"

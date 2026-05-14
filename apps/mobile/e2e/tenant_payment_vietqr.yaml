@@ -1,0 +1,35 @@
+appId: com.rentapp.vn
+---
+- runFlow: helpers/login_tenant.yaml
+
+# Navigate to Hóa đơn tab
+- tapOn: "Hóa đơn"
+- waitForAnimationToEnd
+
+# Open first unpaid invoice
+- scrollUntilVisible:
+    element: "Chưa thanh toán"
+    direction: DOWN
+- tapOn: "Chưa thanh toán"
+- waitForAnimationToEnd
+
+# Verify payment section is visible
+- assertVisible: "Chọn phương thức thanh toán"
+
+# Select VietQR
+- tapOn: "VietQR (chuyển khoản)"
+
+# Initiate payment
+- tapOn:
+    text: "Thanh toán"
+    index: 0
+- waitForAnimationToEnd
+
+# Verify QR screen
+- assertVisible: "Quét mã VietQR để chuyển khoản"
+- assertVisible: "Nội dung chuyển khoản"
+- assertVisible: "Mở app ngân hàng"
+
+# Dismiss QR after mock payment
+- tapOn: "Đã chuyển khoản xong"
+- waitForAnimationToEnd
