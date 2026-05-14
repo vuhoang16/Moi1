@@ -46,6 +46,17 @@ export function useInvoicesByContract(contractId: string) {
   });
 }
 
+export function useLastInvoice(contractId: string | null) {
+  return useQuery({
+    queryKey: [...invoiceKeys.all, 'last', contractId] as const,
+    queryFn: () =>
+      api
+        .get('/invoices', { params: { contractId, limit: 1 } })
+        .then((r) => (Array.isArray(r.data) ? r.data[0] ?? null : null)),
+    enabled: !!contractId,
+  });
+}
+
 export function useInitiatePayment() {
   const qc = useQueryClient();
   return useMutation({

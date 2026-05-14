@@ -12,7 +12,7 @@ import {
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useContracts } from '../../queries/contracts';
-import { useCreateInvoice } from '../../queries/invoices';
+import { useCreateInvoice, useLastInvoice } from '../../queries/invoices';
 import { theme, spacing, typography } from '../../theme';
 import dayjs from 'dayjs';
 
@@ -25,17 +25,19 @@ export default function CreateInvoiceScreen({ navigation }: any) {
   const { data: contracts, isLoading } = useContracts();
   const createInvoice = useCreateInvoice();
 
-  // Active contracts only
-  const activeContracts = useMemo(
-    () => contracts?.filter((c: any) => c.status === 'hieu_luc') ?? [],
-    [contracts],
-  );
-
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [electricityReading, setElectricityReading] = useState('');
   const [waterReading, setWaterReading] = useState('');
   const [otherFees, setOtherFees] = useState<OtherFee[]>([]);
   const [notes, setNotes] = useState('');
+
+  const { data: lastInvoice } = useLastInvoice(selectedContractId);
+
+  // Active contracts only
+  const activeContracts = useMemo(
+    () => contracts?.filter((c: any) => c.status === 'hieu_luc') ?? [],
+    [contracts],
+  );
 
   const selectedContract = useMemo(
     () => activeContracts.find((c: any) => c.id === selectedContractId),
@@ -48,9 +50,14 @@ export default function CreateInvoiceScreen({ navigation }: any) {
   // Calculations
   const electricityVal = parseFloat(electricityReading) || 0;
   const waterVal = parseFloat(waterReading) || 0;
-  const electricityPrev = selectedContract?.room?.property?.electricityRate ? 0 : 0; // Will be auto-calculated server-side
   const electricityRate = selectedContract?.room?.property?.electricityRate ?? 0;
   const waterRate = selectedContract?.room?.property?.waterRate ?? 0;
+
+  const prevElectricity: number | null = lastInvoice?.electricityCurrentReading ?? null;
+  const prevWater: number | null = lastInvoice?.waterCurrentReading ?? null;
+
+  const electricityDelta = electricityReading !== '' && prevElectricity !== null ? electricityVal - prevElectricity : null;
+  const waterDelta = waterReading !== '' && prevWater !== null ? waterVal - prevWater : null;
 
   const otherFeesTotal = otherFees.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
 
@@ -156,6 +163,9 @@ export default function CreateInvoiceScreen({ navigation }: any) {
 
               <View style={styles.meterRow}>
                 <View style={styles.meterField}>
+                  <Text style={styles.prevReading}>
+                    Chỉ số cũ: {prevElectricity !== null ? `${prevElectricity} kWh` : '—'}
+                  </Text>
                   <TextInput
                     label="Chỉ số điện hiện tại (kWh)"
                     value={electricityReading}
@@ -164,6 +174,11 @@ export default function CreateInvoiceScreen({ navigation }: any) {
                     mode="outlined"
                     style={styles.input}
                   />
+                  {electricityDelta !== null && (
+                    <Text style={[styles.delta, electricityDelta < 0 && styles.deltaError]}>
+                      Tiêu thụ: {electricityDelta} kWh
+                    </Text>
+                  )}
                   <HelperText type="info">
                     Giá điện: {electricityRate.toLocaleString('vi-VN')} VND/kWh
                   </HelperText>
@@ -172,6 +187,9 @@ export default function CreateInvoiceScreen({ navigation }: any) {
 
               <View style={styles.meterRow}>
                 <View style={styles.meterField}>
+                  <Text style={styles.prevReading}>
+                    Chỉ số cũ: {prevWater !== null ? `${prevWater} m³` : '—'}
+                  </Text>
                   <TextInput
                     label="Chỉ số nước hiện tại (m³)"
                     value={waterReading}
@@ -180,6 +198,11 @@ export default function CreateInvoiceScreen({ navigation }: any) {
                     mode="outlined"
                     style={styles.input}
                   />
+                  {waterDelta !== null && (
+                    <Text style={[styles.delta, waterDelta < 0 && styles.deltaError]}>
+                      Tiêu thụ: {waterDelta} m³
+                    </Text>
+                  )}
                   <HelperText type="info">
                     Giá nước: {waterRate.toLocaleString('vi-VN')} VND/m³
                   </HelperText>
@@ -294,6 +317,9 @@ const styles = StyleSheet.create({
   contractTenant: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, marginTop: 2 },
   meterRow: { marginBottom: spacing.xs },
   meterField: { flex: 1 },
+  prevReading: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, marginBottom: spacing.xs },
+  delta: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, marginTop: 2, marginBottom: spacing.xs },
+  deltaError: { color: theme.colors.error },
   feeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
   summaryCard: { borderRadius: 12, marginVertical: spacing.md, backgroundColor: theme.colors.primaryContainer },
   summaryTitle: { ...typography.headingSmall, marginBottom: spacing.sm },
