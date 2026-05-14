@@ -6,6 +6,12 @@
     "scheme": "rentapp",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B4F72"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rentapp.vn",
@@ -19,6 +25,11 @@
     "android": {
       "package": "com.rentapp.vn",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B4F72"
+      },
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -27,12 +38,16 @@
         "VIBRATE"
       ]
     },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "extra": {
       "eas": {
         "projectId": "b688848e-1840-42bf-a66b-17d1d1900e2d"
       }
     },
     "plugins": [
+      "expo-dev-client",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       [
@@ -47,7 +62,8 @@
           "cameraPermission": "Chụp ảnh và video cho yêu cầu bảo trì"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-splash-screen"
     ]
   }
 }

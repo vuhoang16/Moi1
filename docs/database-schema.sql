@@ -840,39 +840,61 @@ DECLARE
     tenant_auth_id      UUID := '00000000-0000-0000-0000-000000000002';
     tenant2_auth_id     UUID := '00000000-0000-0000-0000-000000000003';
     prop1_id            UUID := uuid_generate_v4();
+    prop2_id            UUID := uuid_generate_v4();
     room1_id            UUID := uuid_generate_v4();
     room2_id            UUID := uuid_generate_v4();
+    room3_id            UUID := uuid_generate_v4();
+    room4_id            UUID := uuid_generate_v4();
     contract1_id        UUID := uuid_generate_v4();
     contract2_id        UUID := uuid_generate_v4();
     invoice1_id         UUID := uuid_generate_v4();
 BEGIN
 
 -- Profiles (auth.users must exist; in dev, create via Supabase dashboard or Auth API)
+-- Landlord based on real listing contact: Nguyễn Đức Vũ — 0936166578
 INSERT INTO profiles (id, name, phone, role) VALUES
-    (landlord_auth_id, 'Nguyễn Văn An (Chủ nhà)', '0901234567', 'landlord'),
-    (tenant_auth_id,   'Trần Thị Bình (Thuê)',    '0912345678', 'tenant'),
-    (tenant2_auth_id,  'Lê Văn Cường (Thuê)',     '0923456789', 'tenant')
+    (landlord_auth_id, 'Nguyễn Đức Vũ',   '0936166578', 'landlord'),
+    (tenant_auth_id,   'Trần Thị Lan',     '0912345678', 'tenant'),
+    (tenant2_auth_id,  'Phạm Minh Tuấn',   '0923456789', 'tenant')
 ON CONFLICT (id) DO NOTHING;
 
 -- Properties
+-- prop1: real listing — Sleepbox Cao Cấp Thủ Đức (phongtro123.com)
 INSERT INTO properties (id, landlord_id, name, address, type, description, amenities)
 VALUES (
     prop1_id,
     landlord_auth_id,
-    'Nhà trọ An Bình',
-    '123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
+    'Sleepbox Cao Cấp Thủ Đức',
+    '45 Đường Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức, TP.HCM',
     'nha_tro',
-    'Nhà trọ sạch sẽ, yên tĩnh, gần trung tâm.',
-    ARRAY['wifi', 'camera_an_ninh', 'bai_do_xe_may', 'nuoc_nong']
+    'Sleepbox cao cấp mới 100%, có thang máy. Gần ĐH Ngân Hàng, SPKT, Cao đẳng Công Thương, Cao đẳng Nghề. Cách chợ Thủ Đức 500m, cách ngã tư Thủ Đức 300m. Cửa khoá riêng tư, đầy đủ tiện nghi.',
+    ARRAY['thang_may', 'wifi', 'camera_an_ninh', 'bai_do_xe_may', 'nuoc_nong', 'khoa_rieng']
 );
 
--- Rooms
+-- prop2: second building — chung cư mini Quận 7
+INSERT INTO properties (id, landlord_id, name, address, type, description, amenities)
+VALUES (
+    prop2_id,
+    landlord_auth_id,
+    'Chung Cư Mini Quận 7',
+    '18 Đường Huỳnh Tấn Phát, Phường Tân Thuận Đông, Quận 7, TP.HCM',
+    'chung_cu_mini',
+    'Căn hộ mini đầy đủ nội thất, ban công thoáng mát. Gần KCX Tân Thuận, siêu thị BigC Quận 7. An ninh 24/7.',
+    ARRAY['thang_may', 'wifi', 'camera_an_ninh', 'bai_do_xe_may', 'nuoc_nong', 'ban_cong']
+);
+
+-- Rooms — prop1 (Sleepbox, price from real listing: 1.2M/tháng, area 25m²)
 INSERT INTO rooms (id, property_id, name, floor, area_m2, rent_price, deposit_amount, status, amenities)
 VALUES
-    (room1_id, prop1_id, 'Phòng 101', 1, 20.0, 3500000, 7000000, 'da_thue',
-     ARRAY['dieu_hoa', 'tu_lanh', 'may_nuoc_nong']),
-    (room2_id, prop1_id, 'Phòng 102', 1, 18.5, 3200000, 6400000, 'trong',
-     ARRAY['dieu_hoa', 'may_nuoc_nong']);
+    (room1_id, prop1_id, 'Phòng 101', 1, 25.0, 1200000, 2400000, 'da_thue',
+     ARRAY['dieu_hoa', 'may_nuoc_nong', 'khoa_van_tay', 'ban_cong']),
+    (room2_id, prop1_id, 'Phòng 102', 1, 25.0, 1200000, 2400000, 'trong',
+     ARRAY['dieu_hoa', 'may_nuoc_nong', 'khoa_van_tay']),
+    -- Rooms — prop2 (Chung cư mini Quận 7, ~4.5M/tháng)
+    (room3_id, prop2_id, 'Phòng 201', 2, 35.0, 4500000, 9000000, 'da_thue',
+     ARRAY['dieu_hoa', 'tu_lanh', 'may_giat', 'may_nuoc_nong', 'ban_cong']),
+    (room4_id, prop2_id, 'Phòng 202', 2, 32.0, 4200000, 8400000, 'trong',
+     ARRAY['dieu_hoa', 'tu_lanh', 'may_nuoc_nong', 'ban_cong']);
 
 -- Checklist template for room 1
 INSERT INTO checklist_templates (room_id, items) VALUES (
@@ -888,31 +910,32 @@ INSERT INTO checklist_templates (room_id, items) VALUES (
 );
 
 -- Contracts
+-- contract1: active — Trần Thị Lan thuê Phòng 101 tại Sleepbox Thủ Đức
 INSERT INTO contracts (id, room_id, landlord_id, tenant_id, rent_price, deposit_amount,
                        start_date, end_date, status, landlord_signed_at, tenant_signed_at)
 VALUES (
     contract1_id,
     room1_id, landlord_auth_id, tenant_auth_id,
-    3500000, 7000000,
+    1200000, 2400000,
     '2026-01-01', '2026-12-31',
     'active',
     '2025-12-28 10:00:00+07', '2025-12-29 14:00:00+07'
 );
 
--- Draft contract for room 2
+-- contract2: draft — Phạm Minh Tuấn sắp thuê Phòng 201 tại Quận 7
 INSERT INTO contracts (id, room_id, landlord_id, tenant_id, rent_price, deposit_amount,
                        start_date, end_date, status)
 VALUES (
     contract2_id,
-    room2_id, landlord_auth_id, tenant2_auth_id,
-    3200000, 6400000,
-    '2026-05-01', '2027-04-30',
+    room3_id, landlord_auth_id, tenant2_auth_id,
+    4500000, 9000000,
+    '2026-06-01', '2027-05-31',
     'draft'
 );
 
 -- Deposit for active contract
 INSERT INTO deposits (contract_id, amount, status)
-VALUES (contract1_id, 7000000, 'held');
+VALUES (contract1_id, 2400000, 'held');
 
 -- Checkin record
 INSERT INTO checklist_records (contract_id, type, items, signed_at)
@@ -936,37 +959,37 @@ INSERT INTO invoices (id, contract_id, room_id, month, year,
                       water_start, water_end, water_unit_price,
                       service_fee, status, due_date, paid_at)
 VALUES
-    -- January — paid
+    -- January — paid (tiền thuê 1.2M + điện 85kWh×3500 + nước 8m³×15000 + phí dịch vụ 50K = ~1.677M)
     (invoice1_id, contract1_id, room1_id, 1, 2026,
-     3500000, 100, 185, 3500,
+     1200000, 100, 185, 3500,
      10, 18, 15000,
-     100000, 'da_thanh_toan', '2026-01-10', '2026-01-08 09:00:00+07'),
+     50000, 'da_thanh_toan', '2026-01-10', '2026-01-08 09:00:00+07'),
     -- February — paid
     (uuid_generate_v4(), contract1_id, room1_id, 2, 2026,
-     3500000, 185, 268, 3500,
+     1200000, 185, 268, 3500,
      18, 27, 15000,
-     100000, 'da_thanh_toan', '2026-02-10', '2026-02-09 11:00:00+07'),
+     50000, 'da_thanh_toan', '2026-02-10', '2026-02-09 11:00:00+07'),
     -- March — unpaid (overdue)
     (uuid_generate_v4(), contract1_id, room1_id, 3, 2026,
-     3500000, 268, 351, 3500,
+     1200000, 268, 351, 3500,
      27, 36, 15000,
-     100000, 'qua_han', '2026-03-10', NULL),
+     50000, 'qua_han', '2026-03-10', NULL),
     -- April — unpaid (current)
     (uuid_generate_v4(), contract1_id, room1_id, 4, 2026,
-     3500000, 351, 430, 3500,
+     1200000, 351, 430, 3500,
      36, 45, 15000,
-     100000, 'chua_thanh_toan', '2026-04-10', NULL);
+     50000, 'chua_thanh_toan', '2026-04-10', NULL);
 
 -- Payment for January invoice
 INSERT INTO payments (invoice_id, amount, method, status, transaction_ref)
-VALUES (invoice1_id, 3897500, 'momo', 'success', 'MOMO_20260108_001');
+VALUES (invoice1_id, 1547500, 'momo', 'success', 'MOMO_20260108_001');
 
--- Maintenance ticket
+-- Maintenance ticket — thực tế từ listing: điều hoà không mát
 INSERT INTO maintenance_tickets (contract_id, room_id, tenant_id, category, description, priority, status)
 VALUES (
     contract1_id, room1_id, tenant_auth_id,
-    'dien', 'Bóng đèn phòng tắm bị hỏng, cần thay mới.',
-    'trung_binh', 'moi'
+    'dien', 'Điều hoà phòng 101 chạy nhưng không ra hơi lạnh, đã thử reset nhưng không được. Ngoài trời nắng nóng, phòng rất bức bí.',
+    'cao', 'dang_xu_ly'
 );
 
 -- Notifications
@@ -974,12 +997,12 @@ INSERT INTO notifications (user_id, type, title, body, data)
 VALUES
     (tenant_auth_id, 'thanh_toan',
      'Hóa đơn tháng 4/2026 chưa thanh toán',
-     'Hóa đơn tháng 4/2026 phòng 101 sẽ đến hạn ngày 10/04/2026. Vui lòng thanh toán đúng hạn.',
+     'Hóa đơn tháng 4/2026 phòng 101 — Sleepbox Thủ Đức sẽ đến hạn ngày 10/04/2026. Vui lòng thanh toán đúng hạn để tránh phát sinh phí trễ hạn.',
      '{"invoice_id": null, "month": 4, "year": 2026}'),
     (landlord_auth_id, 'sua_chua',
-     'Yêu cầu sửa chữa mới từ phòng 101',
-     'Khách thuê Trần Thị Bình gửi yêu cầu: Bóng đèn phòng tắm bị hỏng.',
-     '{"room_name": "Phòng 101"}');
+     'Yêu cầu bảo trì khẩn từ phòng 101',
+     'Khách thuê Trần Thị Lan gửi yêu cầu: Điều hoà phòng 101 không lạnh. Mức độ: Cao.',
+     '{"room_name": "Phòng 101", "priority": "cao"}');
 
 END $$;
 

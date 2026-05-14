@@ -11,6 +11,10 @@
     "test": "jest",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config test/jest-e2e.json",
+    "test:webhooks": "node scripts/test-webhooks.js",
+    "test:webhooks:momo": "node scripts/test-webhooks.js --gateway momo",
+    "test:webhooks:zalopay": "node scripts/test-webhooks.js --gateway zalopay",
+    "test:webhooks:sepay": "node scripts/test-webhooks.js --gateway sepay",
     "prisma": "prisma"
   },
   "dependencies": {
