@@ -9,7 +9,7 @@ import EmptyState from '../../components/EmptyState';
 import { ListSkeleton } from '../../components/ListSkeleton';
 import { theme, spacing, typography } from '../../theme';
 
-export default function NotificationsScreen() {
+export default function NotificationsScreen({ navigation }: any) {
   const qc = useQueryClient();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['notifications'],
@@ -20,6 +20,26 @@ export default function NotificationsScreen() {
     mutationFn: () => api.patch('/notifications/read-all'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
+
+  const markRead = useMutation({
+    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const handleNotificationPress = (notification: any) => {
+    markRead.mutate(notification.id);
+    const id = notification.relatedEntityId ?? notification.resourceId;
+    const type: string = notification.type ?? '';
+    if (type === 'invoice_created' || type === 'invoice_overdue' || type === 'invoice' || type === 'payment') {
+      navigation.navigate('InvoiceDetail', { id });
+    } else if (type === 'maintenance_update' || type === 'maintenance') {
+      navigation.navigate('MaintenanceDetail', { id });
+    } else if (type === 'contract_expiry_warning' || type === 'contract') {
+      navigation.navigate('ContractDetail', { id });
+    } else if (type === 'new_message' || type === 'chat') {
+      navigation.navigate('ChatScreen', { conversationId: id });
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -41,6 +61,7 @@ export default function NotificationsScreen() {
               title={item.title}
               description={`${item.body}\n${dayjs(item.createdAt).format('DD/MM HH:mm')}`}
               titleStyle={!item.isRead ? styles.unread : undefined}
+              onPress={() => handleNotificationPress(item)}
               left={(props) => (
                 <List.Icon
                   {...props}

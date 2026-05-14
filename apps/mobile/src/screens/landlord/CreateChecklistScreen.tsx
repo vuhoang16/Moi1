@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FlatList, StyleSheet, View, Alert } from 'react-native';
-import { Text, TextInput, Button, IconButton, SegmentedButtons, Card } from 'react-native-paper';
+import { Text, TextInput, Button, IconButton, SegmentedButtons, Card, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -34,6 +34,12 @@ export default function CreateChecklistScreen({ route, navigation }: any) {
   const [phase, setPhase] = useState<'ban_giao' | 'tra_phong'>('ban_giao');
   const [items, setItems] = useState<Item[]>(TEMPLATES);
   const [notes, setNotes] = useState('');
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState<boolean[]>(TEMPLATES.map(() => false));
+
+  const openCategoryMenu = (index: number) =>
+    setCategoryMenuOpen((prev) => prev.map((v, i) => (i === index ? true : v)));
+  const closeCategoryMenu = (index: number) =>
+    setCategoryMenuOpen((prev) => prev.map((v, i) => (i === index ? false : v)));
 
   const { data: checklists } = useChecklistsByContract(contractId);
 
@@ -41,15 +47,15 @@ export default function CreateChecklistScreen({ route, navigation }: any) {
     if (phase === 'tra_phong' && checklists?.length) {
       const banGiao = checklists.find((c: any) => c.phase === 'ban_giao');
       if (banGiao?.records) {
-        setItems(
-          banGiao.records.map((r: any) => ({
-            name: r.name,
-            category: r.category,
-            quantity: r.quantity,
-            conditionOnCheckin: r.conditionOnCheckin,
-            conditionOnCheckout: '',
-          }))
-        );
+        const mapped = banGiao.records.map((r: any) => ({
+          name: r.name,
+          category: r.category,
+          quantity: r.quantity,
+          conditionOnCheckin: r.conditionOnCheckin,
+          conditionOnCheckout: '',
+        }));
+        setItems(mapped);
+        setCategoryMenuOpen(mapped.map(() => false));
       }
     }
   }, [phase, checklists]);
@@ -69,10 +75,12 @@ export default function CreateChecklistScreen({ route, navigation }: any) {
 
   const addItem = () => {
     setItems((prev) => [...prev, { name: '', category: 'Khác', quantity: 1, conditionOnCheckin: '' }]);
+    setCategoryMenuOpen((prev) => [...prev, false]);
   };
 
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
+    setCategoryMenuOpen((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submit = () => {
@@ -127,6 +135,33 @@ export default function CreateChecklistScreen({ route, navigation }: any) {
                 />
                 <IconButton icon="close" onPress={() => removeItem(index)} size={18} />
               </View>
+              <Menu
+                visible={categoryMenuOpen[index] ?? false}
+                onDismiss={() => closeCategoryMenu(index)}
+                anchor={
+                  <Button
+                    mode="outlined"
+                    onPress={() => phase !== 'tra_phong' && openCategoryMenu(index)}
+                    disabled={phase === 'tra_phong'}
+                    style={styles.categoryBtn}
+                    contentStyle={styles.categoryBtnContent}
+                    icon="chevron-down"
+                  >
+                    {item.category || 'Chọn danh mục'}
+                  </Button>
+                }
+              >
+                {CATEGORIES.map((cat) => (
+                  <Menu.Item
+                    key={cat}
+                    title={cat}
+                    onPress={() => {
+                      updateItem(index, 'category', cat);
+                      closeCategoryMenu(index);
+                    }}
+                  />
+                ))}
+              </Menu>
               <TextInput
                 label="Tình trạng khi bàn giao"
                 value={item.conditionOnCheckin}
@@ -183,6 +218,8 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
   nameFld: { flex: 1 },
   qtyFld: { width: 60 },
+  categoryBtn: { marginBottom: spacing.xs, alignSelf: 'flex-start' },
+  categoryBtnContent: { flexDirection: 'row-reverse' },
   condition: { marginBottom: spacing.xs },
   addBtn: { marginTop: spacing.sm },
   notes: { marginTop: spacing.lg },

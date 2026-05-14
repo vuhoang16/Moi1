@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert } from 'react-native';
-import { Text, TextInput, Button, SegmentedButtons } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Alert } from 'react-native';
+import { Text, TextInput, Button, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,17 +28,22 @@ export default function SubmitMaintenanceScreen({ navigation }: any) {
   const [priority, setPriority] = useState<Priority>('trung_binh');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
-  const { data: contracts } = useQuery({
-    queryKey: ['contracts-for-maint'],
-    queryFn: () => api.get('/contracts').then((r) => r.data),
+  const { data: contract, isLoading: contractLoading } = useQuery({
+    queryKey: ['contracts', 'my'],
+    queryFn: () => api.get('/contracts/my').then((r) => r.data),
+    retry: false,
   });
 
-  const activeContracts = (contracts ?? []).filter((c: any) => c.status === 'hieu_luc');
-
-  const { control, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
+  const { control, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { contractId: activeContracts[0]?.id ?? '' },
+    defaultValues: { contractId: '', title: '', description: '' },
   });
+
+  useEffect(() => {
+    if (contract?.id) {
+      setValue('contractId', contract.id);
+    }
+  }, [contract?.id, setValue]);
 
   const submit = useMutation({
     mutationFn: (data: FormData & { priority: Priority; mediaUrls: string[] }) =>
@@ -67,39 +72,37 @@ export default function SubmitMaintenanceScreen({ navigation }: any) {
     submit.mutate({ ...data, priority, mediaUrls });
   };
 
+  if (contractLoading) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Đang tải thông tin hợp đồng...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!contract) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <Text style={styles.emptyText}>Bạn chưa có hợp đồng nào. Không thể gửi yêu cầu.</Text>
+        <Button mode="outlined" onPress={() => navigation.goBack()} style={styles.backBtn}>
+          Quay lại
+        </Button>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Gửi Yêu Cầu Bảo Trì</Text>
-
-        {activeContracts.length > 1 && (
-          <Controller
-            control={control}
-            name="contractId"
-            render={({ field: { onChange, value } }) => (
-              <View style={styles.contractPicker}>
-                {activeContracts.map((c: any) => (
-                  <Button
-                    key={c.id}
-                    mode={value === c.id ? 'contained' : 'outlined'}
-                    compact
-                    onPress={() => onChange(c.id)}
-                    style={styles.contractBtn}
-                  >
-                    {c.room?.roomNumber}
-                  </Button>
-                ))}
-              </View>
-            )}
-          />
-        )}
 
         <Controller
           control={control}
           name="title"
           render={({ field: { onChange, value } }) => (
             <TextInput
-              label="Tiêu đề (VD: Điều hoà không mát)"
+              label="Tiêu đề (VD: Điều hoà phòng 101 không lạnh)"
               value={value}
               onChangeText={onChange}
               mode="outlined"
@@ -177,9 +180,22 @@ export default function SubmitMaintenanceScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  centered: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
   title: { ...typography.headingLarge, marginBottom: spacing.xl, color: theme.colors.primary },
-  contractPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  contractBtn: { marginBottom: 0 },
+  loadingText: { ...typography.body, color: theme.colors.onSurfaceVariant, marginTop: spacing.md },
+  emptyText: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  backBtn: { borderColor: theme.colors.primary },
   section: { ...typography.headingSmall, marginTop: spacing.lg, marginBottom: spacing.sm },
   segment: { marginBottom: spacing.sm },
   input: { marginBottom: spacing.xs },
