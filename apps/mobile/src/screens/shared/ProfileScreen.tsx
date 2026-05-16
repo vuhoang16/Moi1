@@ -3,8 +3,8 @@ import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-nat
 import { Avatar, Button, Divider, Surface, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
-import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../api/client';
+import { pickAndUploadImage } from '../../utils/upload';
 import { useAuthStore } from '../../store/auth.store';
 import { theme, spacing, typography } from '../../theme';
 
@@ -38,19 +38,11 @@ export default function ProfileScreen() {
   };
 
   const handlePickAvatar = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Quyền truy cập', 'Cần quyền truy cập thư viện ảnh để thay đổi ảnh đại diện.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets[0]) {
-      mutation.mutate({ avatarUrl: result.assets[0].uri });
+    try {
+      const url = await pickAndUploadImage('avatars', user?.id ?? 'unknown');
+      if (url) mutation.mutate({ avatarUrl: url });
+    } catch {
+      Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
     }
   };
 
