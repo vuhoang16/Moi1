@@ -10,6 +10,13 @@ import {
 import * as crypto from 'crypto';
 import { PaymentsService } from '../payments/payments.service';
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
 @Controller('webhooks')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
@@ -25,7 +32,7 @@ export class WebhooksController {
     const rawSignature = `accessKey=${process.env.MOMO_ACCESS_KEY}&amount=${body.amount}&extraData=${body.extraData}&message=${message}&orderId=${orderId}&orderInfo=${body.orderInfo}&orderType=${body.orderType}&partnerCode=${body.partnerCode}&payType=${body.payType}&requestId=${body.requestId}&responseTime=${body.responseTime}&resultCode=${resultCode}&transId=${transId}`;
     const expectedSig = crypto.createHmac('sha256', MOMO_SECRET_KEY!).update(rawSignature).digest('hex');
 
-    if (body.signature !== expectedSig) {
+    if (!timingSafeEqual(body.signature ?? '', expectedSig)) {
       this.logger.warn(`MoMo webhook signature mismatch for order ${orderId}`);
       throw new BadRequestException('Invalid signature');
     }
@@ -46,7 +53,7 @@ export class WebhooksController {
     const { data: rawData, mac } = body;
     const expectedMac = crypto.createHmac('sha256', ZALOPAY_KEY2!).update(rawData).digest('hex');
 
-    if (mac !== expectedMac) {
+    if (!timingSafeEqual(mac ?? '', expectedMac)) {
       this.logger.warn('ZaloPay webhook MAC mismatch');
       return { return_code: -1, return_message: 'mac not equal' };
     }
@@ -69,16 +76,16 @@ export class WebhooksController {
     @Body() body: any,
     @Headers('x-api-key') apiKey: string,
   ) {
-    if (apiKey !== process.env.SEPAY_WEBHOOK_SECRET) {
+    if (!timingSafeEqual(apiKey ?? '', process.env.SEPAY_WEBHOOK_SECRET ?? '')) {
       throw new BadRequestException('Invalid API key');
     }
 
     const { transferAmount, description } = body;
-    const match = description?.match(/RENT-([a-zA-Z0-9]{8}-\d+)/);
+    const match = description?.match(/RENT-[a-zA-Z0-9]{8}-[a-zA-Z0-9]+/);
     if (!match) return { success: true };
 
     const orderId = match[0];
-    await this.payments.reconcile(orderId, 'success', body.referenceCode, body);
+    await this.payments.reconcile(orderId, 'success', body.referenceCode, body, Number(transferAmount));
     return { success: true };
   }
 }

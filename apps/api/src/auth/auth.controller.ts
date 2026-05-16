@@ -4,6 +4,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { IsOptional, IsString } from 'class-validator';
@@ -70,6 +71,12 @@ export class AuthController {
       select: { id: true, fullName: true, email: true, phone: true, role: true, avatarUrl: true },
       take: 50,
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  updateProfile(@CurrentUser() user: any, @Body() dto: UpdateProfileDto) {
+    return this.auth.updateProfile(user.id, dto);
   }
 
   @UseGuards(JwtAuthGuard)

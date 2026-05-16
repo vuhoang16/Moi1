@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UserRole } from '@prisma/client';
 
 @Injectable()
@@ -114,6 +115,18 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Refresh token không hợp lệ');
     }
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+      },
+      select: { id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true },
+    });
   }
 
   private issueTokens(userId: string, email: string, role: UserRole) {

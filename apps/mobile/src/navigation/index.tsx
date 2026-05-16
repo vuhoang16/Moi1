@@ -41,6 +41,7 @@ import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PDFViewerScreen from '../screens/shared/PDFViewerScreen';
+import ProfileScreen from '../screens/shared/ProfileScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -87,6 +88,7 @@ export type LandlordStackParamList = {
   ChatScreen: { conversationId: string };
   Notifications: undefined;
   PDFViewer: { url: string };
+  Profile: undefined;
 };
 
 export type TenantStackParamList = {
@@ -98,6 +100,7 @@ export type TenantStackParamList = {
   ChatScreen: { conversationId: string };
   Notifications: undefined;
   PDFViewer: { url: string };
+  Profile: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -143,7 +146,11 @@ function TenantTabNavigator() {
 function LandlordNavigator() {
   return (
     <LandlordStack.Navigator>
-      <LandlordStack.Screen name="LandlordTabs" component={LandlordTabNavigator} options={{ headerShown: false }} />
+      <LandlordStack.Screen
+        name="LandlordTabs"
+        component={LandlordTabNavigator}
+        options={{ headerShown: false }}
+      />
       <LandlordStack.Screen name="PropertyDetail" component={PropertyDetailScreen} options={{ title: 'Chi tiết bất động sản' }} />
       <LandlordStack.Screen name="RoomDetail" component={RoomDetailScreen} options={{ title: 'Chi tiết phòng' }} />
       <LandlordStack.Screen name="CreateProperty" component={CreatePropertyScreen} options={{ title: 'Thêm bất động sản' }} />
@@ -160,6 +167,7 @@ function LandlordNavigator() {
       <LandlordStack.Screen name="ChatScreen" component={ChatScreen} options={{ title: 'Tin nhắn' }} />
       <LandlordStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Thông báo' }} />
       <LandlordStack.Screen name="PDFViewer" component={PDFViewerScreen} options={{ title: 'Xem tài liệu' }} />
+      <LandlordStack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
     </LandlordStack.Navigator>
   );
 }
@@ -175,6 +183,7 @@ function TenantNavigator() {
       <TenantStack.Screen name="ChatScreen" component={ChatScreen} options={{ title: 'Tin nhắn' }} />
       <TenantStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Thông báo' }} />
       <TenantStack.Screen name="PDFViewer" component={PDFViewerScreen} options={{ title: 'Xem tài liệu' }} />
+      <TenantStack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
     </TenantStack.Navigator>
   );
 }

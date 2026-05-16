@@ -6,6 +6,14 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const required = ['DATABASE_URL', 'JWT_SECRET', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+  for (const key of required) {
+    if (!process.env[key]) {
+      console.error(`Missing required env var: ${key}`);
+      process.exit(1);
+    }
+  }
+
   app.setGlobalPrefix('v1');
 
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -19,7 +27,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? '*',
+    origin: process.env.CORS_ORIGIN ?? 'http://localhost:8081',
     credentials: true,
   });
 

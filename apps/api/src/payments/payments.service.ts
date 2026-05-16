@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -12,6 +13,8 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async initiate(tenantId: string, dto: CreatePaymentDto) {
@@ -25,7 +28,7 @@ export class PaymentsService {
       throw new BadRequestException('Hóa đơn đã được thanh toán');
     }
 
-    const orderId = `RENT-${invoice.id.slice(0, 8)}-${Date.now()}`;
+    const orderId = `RENT-${invoice.id.replace(/-/g, '').slice(0, 8)}-${crypto.randomBytes(8).toString('hex')}`;
     const orderInfo = `Thanh toán hóa đơn ${invoice.billingMonth} - ${invoice.room.roomNumber}`;
 
     let gatewayData: { deeplink?: string; qrCodeUrl?: string; payUrl?: string };
@@ -70,30 +73,41 @@ export class PaymentsService {
     });
   }
 
-  async reconcile(orderId: string, status: 'success' | 'failure', transactionId?: string, gatewayResponse?: object) {
+  async reconcile(
+    orderId: string,
+    status: 'success' | 'failure',
+    transactionId?: string,
+    gatewayResponse?: object,
+    expectedAmount?: number,
+  ) {
     const payment = await this.prisma.payment.findUnique({ where: { gatewayOrderId: orderId } });
     if (!payment) return;
-    if (payment.status !== PaymentStatus.cho_xu_ly) return;
+
+    if (expectedAmount !== undefined && payment.amount !== expectedAmount) {
+      this.logger.warn(`Amount mismatch for ${orderId}: expected ${payment.amount}, received ${expectedAmount}`);
+      return;
+    }
 
     if (status === 'success') {
-      await this.prisma.$transaction([
-        this.prisma.payment.update({
-          where: { gatewayOrderId: orderId },
-          data: {
-            status: PaymentStatus.thanh_cong,
-            gatewayTransactionId: transactionId,
-            gatewayResponse: gatewayResponse as any,
-            paidAt: new Date(),
-          },
-        }),
-        this.prisma.invoice.update({
-          where: { id: payment.invoiceId },
-          data: { status: InvoiceStatus.da_thanh_toan, paidAt: new Date() },
-        }),
-      ]);
+      // Atomic idempotency guard — only one concurrent delivery can win this transition
+      const claimed = await this.prisma.payment.updateMany({
+        where: { gatewayOrderId: orderId, status: PaymentStatus.cho_xu_ly },
+        data: {
+          status: PaymentStatus.thanh_cong,
+          gatewayTransactionId: transactionId,
+          gatewayResponse: gatewayResponse as any,
+          paidAt: new Date(),
+        },
+      });
+      if (claimed.count === 0) return;
+
+      await this.prisma.invoice.update({
+        where: { id: payment.invoiceId },
+        data: { status: InvoiceStatus.da_thanh_toan, paidAt: new Date() },
+      });
     } else {
-      await this.prisma.payment.update({
-        where: { gatewayOrderId: orderId },
+      await this.prisma.payment.updateMany({
+        where: { gatewayOrderId: orderId, status: PaymentStatus.cho_xu_ly },
         data: {
           status: PaymentStatus.that_bai,
           gatewayResponse: gatewayResponse as any,
@@ -123,7 +137,10 @@ export class PaymentsService {
       signature,
     });
 
-    if (data.resultCode !== 0) throw new BadRequestException(`MoMo error: ${data.message}`);
+    if (data.resultCode !== 0) {
+      this.logger.error(`MoMo order creation failed for ${orderId}: [${data.resultCode}] ${data.message}`);
+      throw new BadRequestException('Không thể tạo thanh toán MoMo. Vui lòng thử lại.');
+    }
     return { deeplink: data.deeplink, payUrl: data.payUrl };
   }
 
@@ -148,7 +165,10 @@ export class PaymentsService {
       callback_url: ZALOPAY_CALLBACK_URL,
     });
 
-    if (data.return_code !== 1) throw new BadRequestException(`ZaloPay error: ${data.return_message}`);
+    if (data.return_code !== 1) {
+      this.logger.error(`ZaloPay order creation failed for ${orderId}: [${data.return_code}] ${data.return_message}`);
+      throw new BadRequestException('Không thể tạo thanh toán ZaloPay. Vui lòng thử lại.');
+    }
     return { payUrl: data.order_url };
   }
 

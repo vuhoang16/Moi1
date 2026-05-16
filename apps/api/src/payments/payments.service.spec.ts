@@ -10,7 +10,7 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 const makePrisma = () => ({
   invoice: { findUnique: jest.fn(), update: jest.fn() },
-  payment: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
+  payment: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn(), findMany: jest.fn() },
   $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
 });
 
@@ -111,32 +111,43 @@ describe('PaymentsService', () => {
   });
 
   describe('reconcile — idempotency', () => {
-    it('updates payment and invoice on success', async () => {
-      prisma.payment.findUnique.mockResolvedValue({
-        id: 'pay-1',
-        invoiceId: 'inv-1',
-        gatewayOrderId: 'RENT-abc-123',
-        status: PaymentStatus.cho_xu_ly,
-      });
-      prisma.$transaction.mockResolvedValue([]);
+    const pendingPayment = {
+      id: 'pay-1',
+      invoiceId: 'inv-1',
+      amount: 5_500_000,
+      gatewayOrderId: 'RENT-abc-123',
+      status: PaymentStatus.cho_xu_ly,
+    };
+
+    it('atomically updates payment and then updates invoice on success', async () => {
+      prisma.payment.findUnique.mockResolvedValue(pendingPayment);
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+      prisma.invoice.update.mockResolvedValue({});
 
       await service.reconcile('RENT-abc-123', 'success', 'txn-456', { rawData: true });
 
-      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { gatewayOrderId: 'RENT-abc-123', status: PaymentStatus.cho_xu_ly },
+          data: expect.objectContaining({ status: PaymentStatus.thanh_cong, gatewayTransactionId: 'txn-456' }),
+        }),
+      );
+      expect(prisma.invoice.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'inv-1' },
+          data: expect.objectContaining({ status: InvoiceStatus.da_thanh_toan }),
+        }),
+      );
     });
 
-    it('does nothing when payment already reconciled (idempotency)', async () => {
-      prisma.payment.findUnique.mockResolvedValue({
-        id: 'pay-1',
-        invoiceId: 'inv-1',
-        gatewayOrderId: 'RENT-abc-123',
-        status: PaymentStatus.thanh_cong,
-      });
+    it('does nothing when payment already reconciled (idempotency — updateMany count === 0)', async () => {
+      prisma.payment.findUnique.mockResolvedValue({ ...pendingPayment, status: PaymentStatus.thanh_cong });
+      prisma.payment.updateMany.mockResolvedValue({ count: 0 });
 
       await service.reconcile('RENT-abc-123', 'success', 'txn-456');
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(prisma.payment.update).not.toHaveBeenCalled();
+      // updateMany with cho_xu_ly condition returns 0 → invoice must not be touched
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
     });
 
     it('does nothing when payment not found', async () => {
@@ -144,24 +155,50 @@ describe('PaymentsService', () => {
 
       await service.reconcile('RENT-unknown', 'success', 'txn-789');
 
-      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     });
 
-    it('marks payment as that_bai on failure', async () => {
-      prisma.payment.findUnique.mockResolvedValue({
-        id: 'pay-1',
-        invoiceId: 'inv-1',
-        gatewayOrderId: 'RENT-abc-fail',
-        status: PaymentStatus.cho_xu_ly,
-      });
+    it('skips reconciliation and returns when expectedAmount does not match DB amount', async () => {
+      prisma.payment.findUnique.mockResolvedValue(pendingPayment);
+
+      await service.reconcile('RENT-abc-123', 'success', 'txn-789', {}, 1);
+
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally when expectedAmount matches DB amount', async () => {
+      prisma.payment.findUnique.mockResolvedValue(pendingPayment);
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+      prisma.invoice.update.mockResolvedValue({});
+
+      await service.reconcile('RENT-abc-123', 'success', 'txn-789', {}, 5_500_000);
+
+      expect(prisma.payment.updateMany).toHaveBeenCalled();
+      expect(prisma.invoice.update).toHaveBeenCalled();
+    });
+
+    it('marks payment as that_bai on failure using updateMany', async () => {
+      prisma.payment.findUnique.mockResolvedValue(pendingPayment);
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       await service.reconcile('RENT-abc-fail', 'failure');
 
-      expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: expect.objectContaining({ status: PaymentStatus.cho_xu_ly }),
           data: expect.objectContaining({ status: PaymentStatus.that_bai }),
         }),
       );
+    });
+
+    it('does not update invoice on failure', async () => {
+      prisma.payment.findUnique.mockResolvedValue(pendingPayment);
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.reconcile('RENT-abc-fail', 'failure');
+
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
     });
   });
 });

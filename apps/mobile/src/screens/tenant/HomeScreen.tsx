@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Text, Card, Chip, Button } from 'react-native-paper';
+import { Text, Card, Chip, Button, Avatar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -39,10 +39,27 @@ export default function TenantHomeScreen({ navigation }: any) {
 
   const latestInvoice = invoices?.[0];
 
+  const initials = (user?.fullName ?? '')
+    .split(' ')
+    .map((w: string) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.greeting}>Xin chào, {user?.fullName}!</Text>
+        <View style={styles.greetingRow}>
+          <Text style={styles.greeting}>Xin chào, {user?.fullName}!</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            {user?.avatarUrl ? (
+              <Avatar.Image size={36} source={{ uri: user.avatarUrl }} />
+            ) : (
+              <Avatar.Text size={36} label={initials || '?'} style={styles.avatar} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         {contractLoading ? (
           <Card style={styles.card}>
@@ -156,7 +173,9 @@ export default function TenantHomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: spacing.lg },
-  greeting: { ...typography.headingMedium, marginBottom: spacing.lg },
+  greetingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
+  greeting: { ...typography.headingMedium, flex: 1 },
+  avatar: { backgroundColor: theme.colors.primary },
   card: { borderRadius: 12, marginBottom: spacing.md },
   sectionLabel: {
     ...typography.label,

@@ -2,7 +2,38 @@
   "permissions": {
     "allow": [
       "mcp__stitch__list_screens",
-      "mcp__stitch__generate_screen_from_text"
-    ]
+      "mcp__stitch__generate_screen_from_text",
+      "Bash(git *)",
+      "Bash(xargs wc *)",
+      "mcp__stitch__get_screen",
+      "WebFetch(domain:lh3.googleusercontent.com)",
+      "WebFetch(domain:nha.chotot.com)",
+      "WebFetch(domain:batdongsan.com.vn)",
+      "WebFetch(domain:www.nhatot.com)",
+      "WebFetch(domain:phongtro123.com)",
+      "WebFetch(domain:cho-thue-phong-tro.business.site)",
+      "Bash(node apps/mobile/scripts/generate-assets.js)",
+      "Bash(docker info *)",
+      "Bash(docker-compose up *)",
+      "Bash(npx prisma *)",
+      "Bash(pnpm dev:api)",
+      "Bash(echo \"API starting \\(PID $!\\)\")",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(npx tsc *)",
+      "Bash(pkill -f \"nest start\")",
+      "Bash(pkill -f \"ts-node\")",
+      "Bash(echo \"API PID: $!\")",
+      "Bash(npx expo *)",
+      "Bash(echo \"expo run:android started \\(PID $!\\)\")",
+      "Bash(echo \"PID: $!\")",
+      "Bash(pnpm install *)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)",
+      "PowerShell(head *)",
+      "PowerShell(Get-Item *)",
+      "Skill(update-config)",
+      "Bash(node *)"
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }
