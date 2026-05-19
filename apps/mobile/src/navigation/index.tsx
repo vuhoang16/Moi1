@@ -3,8 +3,10 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Snackbar } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/auth.store';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { theme } from '../theme';
 
 // Auth screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -120,14 +122,36 @@ function AuthNavigator() {
   );
 }
 
+const LANDLORD_TAB_ICONS: Record<string, string> = {
+  Home: 'home',
+  Properties: 'office-building',
+  Contracts: 'file-document-outline',
+  Reports: 'chart-bar',
+  Chat: 'chat-outline',
+};
+
 function LandlordTabNavigator() {
   return (
-    <LandlordTab.Navigator screenOptions={{ headerShown: false }}>
-      <LandlordTab.Screen name="Home" component={LandlordHomeScreen} options={{ title: 'Tổng quan' }} />
-      <LandlordTab.Screen name="Properties" component={PropertiesScreen} options={{ title: 'Bất động sản' }} />
-      <LandlordTab.Screen name="Contracts" component={ContractListScreen} options={{ title: 'Hợp đồng' }} />
-      <LandlordTab.Screen name="Reports" component={ReportsScreen} options={{ title: 'Báo cáo' }} />
-      <LandlordTab.Screen name="Chat" component={ChatListScreen} options={{ title: 'Tin nhắn' }} />
+    <LandlordTab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: '#9E9E9E',
+        tabBarStyle: { paddingBottom: 4 },
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons
+            name={LANDLORD_TAB_ICONS[route.name] as any}
+            size={size}
+            color={color}
+          />
+        ),
+      })}
+    >
+      <LandlordTab.Screen name="Home" component={LandlordHomeScreen} options={{ title: 'Trang Chủ' }} />
+      <LandlordTab.Screen name="Properties" component={PropertiesScreen} options={{ title: 'Phòng' }} />
+      <LandlordTab.Screen name="Contracts" component={ContractListScreen} options={{ title: 'Hợp Đồng' }} />
+      <LandlordTab.Screen name="Reports" component={ReportsScreen} options={{ title: 'Báo Cáo' }} />
+      <LandlordTab.Screen name="Chat" component={ChatListScreen} options={{ title: 'Tin Nhắn' }} />
     </LandlordTab.Navigator>
   );
 }
