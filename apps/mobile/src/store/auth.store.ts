@@ -3,6 +3,19 @@ import * as SecureStore from 'expo-secure-store';
 import type { User, AuthTokens } from '@rentapp/shared';
 import { api } from '../api/client';
 
+const MOCK_ROLE = process.env.EXPO_PUBLIC_MOCK_AUTH as 'landlord' | 'tenant' | undefined;
+const MOCK_USER: User | null = MOCK_ROLE
+  ? {
+      id: 'mock-001',
+      email: 'demo@rentapp.vn',
+      fullName: MOCK_ROLE === 'landlord' ? 'Chủ nhà Demo' : 'Người thuê Demo',
+      phone: '0901234567',
+      role: MOCK_ROLE === 'landlord' ? 'chu_nha' : 'nguoi_thue',
+      isVerified: true,
+      createdAt: new Date().toISOString(),
+    }
+  : null;
+
 interface AuthState {
   user: User | null;
   isLoading: boolean;
@@ -30,6 +43,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   loadStoredAuth: async () => {
+    if (MOCK_USER) {
+      set({ user: MOCK_USER, isLoading: false });
+      return;
+    }
     set({ isLoading: true });
     try {
       const token = await SecureStore.getItemAsync('access_token');
