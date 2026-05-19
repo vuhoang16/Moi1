@@ -100,7 +100,7 @@ function DatePickerField({ label, value, onChange, minimumDate, error }: DatePic
         mode: 'date',
         display: 'calendar',
         minimumDate,
-        onChange: (_e, date) => {
+        onChange: (_e: unknown, date?: Date) => {
           if (date) onChange(dateToIso(date));
         },
       });
@@ -134,7 +134,7 @@ function DatePickerField({ label, value, onChange, minimumDate, error }: DatePic
           display="spinner"
           locale="vi"
           minimumDate={minimumDate}
-          onChange={(_e, date) => {
+          onChange={(_e: unknown, date?: Date) => {
             if (date) onChange(dateToIso(date));
             setShowIos(false);
           }}

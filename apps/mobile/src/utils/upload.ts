@@ -2,12 +2,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
-);
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const MOCK_STORAGE = !SUPABASE_URL || SUPABASE_URL.includes('placeholder');
+const PLACEHOLDER_IMG = 'https://placehold.co/600x400/1B4F72/white?text=Anh';
+
+const supabase = MOCK_STORAGE
+  ? null
+  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function compressAndUpload(uri: string, bucket: string, folder: string): Promise<string> {
+  if (MOCK_STORAGE || !supabase) return PLACEHOLDER_IMG;
+
   const compressed = await ImageManipulator.manipulateAsync(
     uri,
     [{ resize: { width: 1280 } }],
@@ -71,6 +77,8 @@ export async function pickAndUploadVideo(bucket: string, folder: string): Promis
   if (asset.fileSize && asset.fileSize > 52_428_800) {
     throw new Error('Video phải nhỏ hơn 50MB');
   }
+
+  if (MOCK_STORAGE || !supabase) return PLACEHOLDER_IMG;
 
   const response = await fetch(asset.uri);
   const blob = await response.blob();

@@ -47,9 +47,6 @@
       }
     },
     "plugins": [
-      "expo-dev-client",
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging",
       [
         "expo-image-picker",
         {
@@ -63,7 +60,9 @@
         }
       ],
       "expo-secure-store",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-sharing",
+      "expo-font"
     ]
   }
 }

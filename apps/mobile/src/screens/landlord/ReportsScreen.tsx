@@ -10,7 +10,7 @@ import {
   Chip,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
