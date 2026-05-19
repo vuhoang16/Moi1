@@ -8,37 +8,48 @@ import {
   View,
   Alert,
 } from 'react-native';
-import {
-  ActivityIndicator,
-  Button,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../store/auth.store';
-import { theme, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 
 const { width } = Dimensions.get('window');
 
+const PRIMARY = '#1B4F72';
+const ACCENT = '#00BFA5';
+const ERROR_RED = '#EF5350';
+const SUCCESS_GREEN = '#27AE60';
+const TEXT_MAIN = '#1A2B3C';
+const TEXT_GRAY = '#7F8C8D';
+const BORDER_COLOR = '#E0E0E0';
+const SURFACE = '#FFFFFF';
+const BG = '#FFFFFF';
+
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  high:       { label: 'CAO',      color: '#C0392B', bg: '#FDEDEC' },
-  cao:        { label: 'CAO',      color: '#C0392B', bg: '#FDEDEC' },
-  khan_cap:   { label: 'KHẨN CẤP',color: '#922B21', bg: '#F9EBEA' },
-  medium:     { label: 'TRUNG BÌNH', color: '#E67E22', bg: '#FEF3E2' },
-  trung_binh: { label: 'TRUNG BÌNH', color: '#E67E22', bg: '#FEF3E2' },
-  low:        { label: 'THẤP',     color: '#27AE60', bg: '#EAFAF1' },
-  thap:       { label: 'THẤP',     color: '#27AE60', bg: '#EAFAF1' },
+  high:       { label: 'CAO',       color: '#FFFFFF', bg: '#EF5350' },
+  cao:        { label: 'CAO',       color: '#FFFFFF', bg: '#EF5350' },
+  khan_cap:   { label: 'KHẨN CẤP', color: '#FFFFFF', bg: '#C62828' },
+  medium:     { label: 'TRUNG BÌNH', color: '#FFFFFF', bg: '#E67E22' },
+  trung_binh: { label: 'TRUNG BÌNH', color: '#FFFFFF', bg: '#E67E22' },
+  low:        { label: 'THẤP',      color: '#FFFFFF', bg: '#27AE60' },
+  thap:       { label: 'THẤP',      color: '#FFFFFF', bg: '#27AE60' },
 };
 
 const STATUS_STEPS = [
-  { value: 'pending',     label: 'Chờ xử lý' },
-  { value: 'in_progress', label: 'Đang xử lý' },
-  { value: 'completed',   label: 'Hoàn thành' },
+  { value: 'pending',     label: 'Chờ Xử Lý' },
+  { value: 'in_progress', label: 'Đang Xử Lý' },
+  { value: 'completed',   label: 'Hoàn Thành' },
 ];
+
+const STEP_NOTES: Record<string, string> = {
+  pending:     'Yêu cầu đang chờ xử lý',
+  in_progress: 'Kỹ thuật viên đang kiểm tra',
+  completed:   'Yêu cầu đã hoàn thành',
+};
 
 const LEGACY_TO_STANDARD: Record<string, string> = {
   cho_xu_ly:   'pending',
@@ -66,43 +77,56 @@ function getStepIndex(status: string): number {
 }
 
 function ProgressTimeline({ status }: { status: string }) {
+  const normStatus = normaliseStatus(status);
   const activeIdx = getStepIndex(status);
-  const isRejected = normaliseStatus(status) === 'rejected';
+  const isRejected = normStatus === 'rejected';
+  const note = STEP_NOTES[normStatus] ?? '';
 
   return (
-    <View style={tlStyles.row}>
-      {STATUS_STEPS.map((step, idx) => {
-        const isActive = idx <= activeIdx;
-        const isLast = idx === STATUS_STEPS.length - 1;
-        const circleColor = isActive
-          ? isRejected && idx === activeIdx
-            ? theme.colors.error
-            : theme.colors.primary
-          : '#D5D8DC';
-        const lineColor = idx < activeIdx ? theme.colors.primary : '#D5D8DC';
+    <View>
+      <View style={tlStyles.row}>
+        {STATUS_STEPS.map((step, idx) => {
+          const isPast = idx < activeIdx;
+          const isActive = idx === activeIdx;
+          const isLast = idx === STATUS_STEPS.length - 1;
 
-        return (
-          <React.Fragment key={step.value}>
-            <View style={tlStyles.stepCol}>
-              <View style={[tlStyles.circle, { backgroundColor: circleColor }]}>
-                {isActive ? (
-                  <MaterialCommunityIcons
-                    name={isRejected && idx === activeIdx ? 'close' : 'check'}
-                    size={12}
-                    color="#fff"
-                  />
-                ) : (
-                  <View style={tlStyles.emptyInner} />
-                )}
+          const circleBg = isPast || isActive
+            ? isRejected && isActive
+              ? ERROR_RED
+              : PRIMARY
+            : 'transparent';
+
+          const circleBorder = isPast || isActive ? 'transparent' : '#BDC3C7';
+          const lineColor = isPast ? PRIMARY : '#BDC3C7';
+
+          return (
+            <React.Fragment key={step.value}>
+              <View style={tlStyles.stepCol}>
+                <View style={[tlStyles.circle, { backgroundColor: circleBg, borderColor: circleBorder }]}>
+                  {(isPast || isActive) ? (
+                    <MaterialCommunityIcons
+                      name={isRejected && isActive ? 'close' : 'check'}
+                      size={14}
+                      color="#FFFFFF"
+                    />
+                  ) : (
+                    <View style={tlStyles.emptyInner} />
+                  )}
+                </View>
+                <Text style={[tlStyles.stepLabel, (isPast || isActive) && tlStyles.stepLabelActive]}>
+                  {step.label}
+                </Text>
               </View>
-              <Text style={tlStyles.stepLabel} numberOfLines={2}>{step.label}</Text>
-            </View>
-            {!isLast && (
-              <View style={[tlStyles.line, { backgroundColor: lineColor }]} />
-            )}
-          </React.Fragment>
-        );
-      })}
+              {!isLast && (
+                <View style={[tlStyles.line, { backgroundColor: lineColor }]} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+      {note ? (
+        <Text style={tlStyles.note}>{note}</Text>
+      ) : null}
     </View>
   );
 }
@@ -115,13 +139,14 @@ const tlStyles = StyleSheet.create({
   },
   stepCol: {
     alignItems: 'center',
-    width: 64,
+    width: 72,
     gap: spacing.xs,
   },
   circle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -129,28 +154,35 @@ const tlStyles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#fff',
+    backgroundColor: '#BDC3C7',
   },
   line: {
     flex: 1,
     height: 2,
-    marginTop: 13,
+    marginTop: 14,
     marginHorizontal: -spacing.xs,
   },
   stepLabel: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
+    fontSize: 11,
+    fontWeight: '500',
+    color: TEXT_GRAY,
     textAlign: 'center',
+    lineHeight: 16,
+  },
+  stepLabelActive: {
+    color: PRIMARY,
+    fontWeight: '700',
+  },
+  note: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: TEXT_GRAY,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 });
 
-function StatusDropdown({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function StatusDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const selected = DROPDOWN_OPTIONS.find((o) => o.value === value);
 
@@ -165,7 +197,7 @@ function StatusDropdown({
         <MaterialCommunityIcons
           name={open ? 'chevron-up' : 'chevron-down'}
           size={20}
-          color={theme.colors.onSurfaceVariant}
+          color={TEXT_GRAY}
         />
       </TouchableOpacity>
       {open && (
@@ -174,17 +206,9 @@ function StatusDropdown({
             <TouchableOpacity
               key={opt.value}
               style={[ddStyles.option, opt.value === value && ddStyles.optionActive]}
-              onPress={() => {
-                onChange(opt.value);
-                setOpen(false);
-              }}
+              onPress={() => { onChange(opt.value); setOpen(false); }}
             >
-              <Text
-                style={[
-                  ddStyles.optionText,
-                  opt.value === value && ddStyles.optionTextActive,
-                ]}
-              >
+              <Text style={[ddStyles.optionText, opt.value === value && ddStyles.optionTextActive]}>
                 {opt.label}
               </Text>
             </TouchableOpacity>
@@ -200,23 +224,21 @@ const ddStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#BDC3C7',
-    borderRadius: theme.roundness,
-    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER_COLOR,
     paddingVertical: spacing.sm,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: SURFACE,
   },
   triggerText: {
     ...typography.body,
-    color: theme.colors.onSurface,
+    color: TEXT_MAIN,
   },
   menu: {
     marginTop: 2,
     borderWidth: 1,
-    borderColor: '#BDC3C7',
-    borderRadius: theme.roundness,
-    backgroundColor: theme.colors.surface,
+    borderColor: BORDER_COLOR,
+    borderRadius: 8,
+    backgroundColor: SURFACE,
     overflow: 'hidden',
     elevation: 4,
   },
@@ -225,50 +247,19 @@ const ddStyles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
   },
   optionActive: {
-    backgroundColor: theme.colors.primaryContainer,
+    backgroundColor: '#EBF5FB',
   },
   optionText: {
     ...typography.body,
-    color: theme.colors.onSurface,
+    color: TEXT_MAIN,
   },
   optionTextActive: {
-    color: theme.colors.primary,
+    color: PRIMARY,
     fontWeight: '600',
   },
 });
 
-function StarRating({
-  value,
-  onSelect,
-}: {
-  value: number | null;
-  onSelect: (v: number) => void;
-}) {
-  return (
-    <View style={starStyles.row}>
-      {[1, 2, 3, 4, 5].map((s) => (
-        <TouchableOpacity key={s} onPress={() => onSelect(s)} activeOpacity={0.7}>
-          <MaterialCommunityIcons
-            name={value && s <= value ? 'star' : 'star-outline'}
-            size={36}
-            color={value && s <= value ? '#F4D03F' : '#BDC3C7'}
-          />
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
-const starStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    justifyContent: 'center',
-    marginVertical: spacing.sm,
-  },
-});
-
-export default function MaintenanceDetailScreen({ route }: any) {
+export default function MaintenanceDetailScreen({ navigation, route }: any) {
   const { id } = route.params;
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
@@ -281,8 +272,6 @@ export default function MaintenanceDetailScreen({ route }: any) {
   const [newStatus, setNewStatus] = useState<string>('');
   const [worker, setWorker] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
-  const [rating, setRating] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState('');
 
   React.useEffect(() => {
     if (ticket) {
@@ -306,30 +295,41 @@ export default function MaintenanceDetailScreen({ route }: any) {
       Alert.alert('Lỗi', err.response?.data?.message ?? 'Cập nhật thất bại'),
   });
 
-  const rateMutation = useMutation({
+  const completeMutation = useMutation({
     mutationFn: () =>
-      api
-        .patch(`/maintenance/${id}/rate`, { tenantRating: rating, tenantFeedback: feedback })
-        .then((r) => r.data),
+      api.patch(`/maintenance/${id}`, { status: 'completed' }).then((r) => r.data),
     onSuccess: () => {
       refetch();
-      Alert.alert('Cảm ơn!', 'Đánh giá của bạn đã được ghi nhận');
+      qc.invalidateQueries({ queryKey: ['maintenance'] });
+      Alert.alert('Thành công', 'Yêu cầu đã được đánh dấu hoàn thành');
     },
     onError: (err: any) =>
-      Alert.alert('Lỗi', err.response?.data?.message ?? 'Gửi đánh giá thất bại'),
+      Alert.alert('Lỗi', err.response?.data?.message ?? 'Thao tác thất bại'),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: () =>
+      api.patch(`/maintenance/${id}`, { status: 'rejected' }).then((r) => r.data),
+    onSuccess: () => {
+      refetch();
+      qc.invalidateQueries({ queryKey: ['maintenance'] });
+      Alert.alert('Đã từ chối', 'Yêu cầu bảo trì đã bị từ chối');
+    },
+    onError: (err: any) =>
+      Alert.alert('Lỗi', err.response?.data?.message ?? 'Thao tác thất bại'),
   });
 
   if (isLoading) {
-    return <ActivityIndicator style={{ flex: 1 }} color={theme.colors.primary} />;
+    return <ActivityIndicator style={{ flex: 1 }} color={PRIMARY} />;
   }
   if (!ticket) return null;
 
   const isLandlord = user?.role === 'chu_nha';
-  const isTenant = user?.role === 'nguoi_thue';
   const media: string[] = ticket.mediaUrls ?? [];
   const normStatus = normaliseStatus(ticket.status);
   const priorityCfg = PRIORITY_CONFIG[ticket.priority] ?? null;
-  const responses: any[] = ticket.responses ?? ticket.updates ?? [];
+  const roomLabel = ticket.room?.roomNumber ? `Phòng ${ticket.room.roomNumber}` : '';
+  const isResolved = normStatus === 'completed' || normStatus === 'rejected';
 
   const handleUpdate = () => {
     const payload: any = {};
@@ -339,41 +339,59 @@ export default function MaintenanceDetailScreen({ route }: any) {
       const parsed = dayjs(scheduledDate, 'DD/MM/YYYY');
       if (parsed.isValid()) payload.scheduledDate = parsed.toISOString();
     }
+    if (Object.keys(payload).length === 0) {
+      Alert.alert('Thông báo', 'Không có thay đổi nào để cập nhật');
+      return;
+    }
     updateMutation.mutate(payload);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleSection}>
-          <Text style={styles.roomSub}>
-            {ticket.room?.roomNumber ? `Phòng ${ticket.room.roomNumber}` : ''}
-          </Text>
-          <Text style={styles.titleText}>{ticket.title}</Text>
+      <View style={styles.customHeader}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={TEXT_MAIN} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Chi tiết bảo trì</Text>
+          {roomLabel ? <Text style={styles.headerSub}>{roomLabel}</Text> : null}
         </View>
+        <View style={styles.backBtn} />
+      </View>
 
-        {priorityCfg && (
-          <View style={[styles.priorityPill, { backgroundColor: priorityCfg.bg }]}>
-            <Text style={[styles.priorityLabel, { color: priorityCfg.color }]}>
-              {priorityCfg.label}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.summaryCard}>
+          {roomLabel ? <Text style={styles.roomLabel}>{roomLabel}</Text> : null}
+
+          <View style={styles.summaryTitleRow}>
+            <Text style={styles.issueTitle} numberOfLines={3}>{ticket.title}</Text>
+            {priorityCfg && (
+              <View style={[styles.priorityPill, { backgroundColor: priorityCfg.bg }]}>
+                <Text style={styles.priorityLabel}>{priorityCfg.label}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.dateRow}>
+            <MaterialCommunityIcons name="clock-outline" size={14} color={TEXT_GRAY} />
+            <Text style={styles.dateText}>
+              {dayjs(ticket.createdAt).format('DD/MM/YYYY - HH:mm')}
             </Text>
           </View>
-        )}
+        </View>
 
-        <View style={styles.card}>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Tiến độ</Text>
           <ProgressTimeline status={ticket.status} />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionHeading}>Mô tả</Text>
-          <Text style={styles.descText}>{ticket.description}</Text>
-          <Text style={styles.metaText}>
-            {dayjs(ticket.createdAt).format('DD/MM/YYYY HH:mm')}
-          </Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Mô tả</Text>
+          <Text style={styles.descText}>{ticket.description ?? 'Không có mô tả'}</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionHeading}>Hình ảnh</Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Hình ảnh đính kèm</Text>
           {media.length > 0 ? (
             <ScrollView
               horizontal
@@ -391,126 +409,97 @@ export default function MaintenanceDetailScreen({ route }: any) {
             </ScrollView>
           ) : (
             <View style={styles.photoPlaceholder}>
-              <MaterialCommunityIcons
-                name="image-off-outline"
-                size={32}
-                color={theme.colors.onSurfaceVariant}
-              />
-              <Text style={styles.photoPlaceholderText}>Không có hình ảnh</Text>
+              <MaterialCommunityIcons name="image-off-outline" size={28} color={TEXT_GRAY} />
+              <Text style={styles.placeholderText}>Không có hình ảnh</Text>
             </View>
           )}
         </View>
 
-        {isLandlord && normStatus !== 'completed' && normStatus !== 'rejected' && (
-          <View style={styles.card}>
-            <Text style={styles.sectionHeading}>Cập nhật trạng thái</Text>
+        {isLandlord && !isResolved && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionLabel}>Cập nhật nội bộ</Text>
 
-            <Text style={styles.fieldLabel}>Trạng thái</Text>
-            <StatusDropdown value={newStatus} onChange={setNewStatus} />
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Thợ phụ trách</Text>
+              <TextInput
+                value={worker}
+                onChangeText={setWorker}
+                mode="flat"
+                placeholder="Nhập tên thợ"
+                style={styles.flatInput}
+                underlineColor={BORDER_COLOR}
+                activeUnderlineColor={PRIMARY}
+                dense
+              />
+            </View>
 
-            <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Thợ phụ trách</Text>
-            <TextInput
-              value={worker}
-              onChangeText={setWorker}
-              mode="outlined"
-              placeholder="Tên thợ phụ trách"
-              style={styles.textInput}
-              outlineStyle={styles.inputOutline}
-            />
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Ngày hẹn</Text>
+              <TextInput
+                value={scheduledDate}
+                onChangeText={setScheduledDate}
+                mode="flat"
+                placeholder="DD/MM/YYYY"
+                keyboardType="numbers-and-punctuation"
+                style={styles.flatInput}
+                underlineColor={BORDER_COLOR}
+                activeUnderlineColor={PRIMARY}
+                dense
+                right={<TextInput.Icon icon="calendar" color={TEXT_GRAY} />}
+              />
+            </View>
 
-            <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Ngày hẹn</Text>
-            <TextInput
-              value={scheduledDate}
-              onChangeText={setScheduledDate}
-              mode="outlined"
-              placeholder="DD/MM/YYYY"
-              keyboardType="numbers-and-punctuation"
-              style={styles.textInput}
-              outlineStyle={styles.inputOutline}
-              right={<TextInput.Icon icon="calendar" />}
-            />
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Trạng thái</Text>
+              <StatusDropdown value={newStatus} onChange={setNewStatus} />
+            </View>
 
             <Button
-              mode="contained"
+              mode="outlined"
               onPress={handleUpdate}
               loading={updateMutation.isPending}
               style={styles.updateBtn}
               contentStyle={styles.updateBtnContent}
+              textColor={PRIMARY}
+              theme={{ colors: { outline: PRIMARY } }}
             >
               Cập Nhật
             </Button>
           </View>
         )}
-
-        {responses.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.sectionHeading}>Lịch sử phản hồi</Text>
-            <View style={styles.responseList}>
-              {responses.map((resp: any, idx: number) => (
-                <View key={idx} style={styles.responseBubble}>
-                  <View style={styles.responseHeader}>
-                    <Text style={styles.responderName}>
-                      {resp.responderName ?? resp.author ?? 'Hệ thống'}
-                    </Text>
-                    <Text style={styles.responseTime}>
-                      {dayjs(resp.createdAt ?? resp.timestamp).format('DD/MM HH:mm')}
-                    </Text>
-                  </View>
-                  <Text style={styles.responseMsg}>
-                    {resp.message ?? resp.content ?? ''}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {isTenant && normStatus === 'completed' && !ticket.tenantRating && (
-          <View style={styles.card}>
-            <Text style={styles.sectionHeading}>Đánh giá dịch vụ</Text>
-            <StarRating value={rating} onSelect={setRating} />
-            <TextInput
-              value={feedback}
-              onChangeText={setFeedback}
-              mode="outlined"
-              label="Nhận xét (tuỳ chọn)"
-              multiline
-              numberOfLines={3}
-              style={styles.textInput}
-              outlineStyle={styles.inputOutline}
-            />
-            <Button
-              mode="contained"
-              onPress={() => rateMutation.mutate()}
-              loading={rateMutation.isPending}
-              disabled={!rating}
-              style={styles.updateBtn}
-              contentStyle={styles.updateBtnContent}
-            >
-              Gửi đánh giá
-            </Button>
-          </View>
-        )}
-
-        {ticket.tenantRating && (
-          <View style={styles.card}>
-            <Text style={styles.sectionHeading}>Đánh giá của bạn</Text>
-            <View style={starStyles.row}>
-              {[1, 2, 3, 4, 5].map((s) => (
-                <MaterialCommunityIcons
-                  key={s}
-                  name={s <= ticket.tenantRating ? 'star' : 'star-outline'}
-                  size={32}
-                  color={s <= ticket.tenantRating ? '#F4D03F' : '#BDC3C7'}
-                />
-              ))}
-            </View>
-            {ticket.tenantFeedback ? (
-              <Text style={styles.descText}>{ticket.tenantFeedback}</Text>
-            ) : null}
-          </View>
-        )}
       </ScrollView>
+
+      {isLandlord && !isResolved && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.bottomBtn, styles.completeBtn]}
+            onPress={() =>
+              Alert.alert('Xác nhận', 'Đánh dấu yêu cầu là hoàn thành?', [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Xác nhận', onPress: () => completeMutation.mutate() },
+              ])
+            }
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.completeBtnText}>Hoàn Thành</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.bottomBtn, styles.rejectBtn]}
+            onPress={() =>
+              Alert.alert('Xác nhận', 'Từ chối yêu cầu bảo trì này?', [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Từ chối', style: 'destructive', onPress: () => rejectMutation.mutate() },
+              ])
+            }
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="close-circle-outline" size={18} color={ERROR_RED} />
+            <Text style={styles.rejectBtnText}>Từ Chối</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -518,122 +507,195 @@ export default function MaintenanceDetailScreen({ route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: BG,
+  },
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER_COLOR,
+    backgroundColor: SURFACE,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+  },
+  headerSub: {
+    fontSize: 12,
+    color: TEXT_GRAY,
   },
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xl + 70,
   },
-  titleSection: {
-    gap: spacing.xs,
-  },
-  roomSub: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  titleText: {
-    ...typography.headingLarge,
-    color: theme.colors.onSurface,
-  },
-  priorityPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 24,
-  },
-  priorityLabel: {
-    ...typography.label,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.roundness,
+  summaryCard: {
+    backgroundColor: SURFACE,
+    borderRadius: 12,
     padding: spacing.md,
     gap: spacing.sm,
-    elevation: 1,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
-  sectionHeading: {
-    ...typography.headingSmall,
-    color: theme.colors.primary,
+  roomLabel: {
+    fontSize: 12,
+    color: TEXT_GRAY,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  summaryTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  issueTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+    lineHeight: 26,
+  },
+  priorityPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 20,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  },
+  priorityLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dateText: {
+    fontSize: 13,
+    color: TEXT_GRAY,
+  },
+  sectionCard: {
+    backgroundColor: SURFACE,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: spacing.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT_GRAY,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   descText: {
-    ...typography.body,
-    color: theme.colors.onSurface,
-  },
-  metaText: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
+    fontSize: 14,
+    color: TEXT_MAIN,
+    lineHeight: 22,
   },
   photoScroll: {
-    marginTop: spacing.xs,
+    marginTop: 4,
   },
   photo: {
-    width: width * 0.6,
-    height: 180,
-    borderRadius: theme.roundness,
+    width: 80,
+    height: 80,
+    borderRadius: 8,
     marginRight: spacing.sm,
   },
   photoPlaceholder: {
     alignItems: 'center',
-    paddingVertical: spacing.lg,
-    gap: spacing.sm,
-  },
-  photoPlaceholderText: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
-  },
-  fieldLabel: {
-    ...typography.label,
-    color: theme.colors.onSurfaceVariant,
-    marginBottom: 2,
-  },
-  textInput: {
-    backgroundColor: theme.colors.surface,
-  },
-  inputOutline: {
-    borderRadius: theme.roundness,
-  },
-  updateBtn: {
-    marginTop: spacing.sm,
-    borderRadius: theme.roundness,
-  },
-  updateBtnContent: {
-    paddingVertical: spacing.xs,
-  },
-  responseList: {
-    gap: spacing.sm,
-  },
-  responseBubble: {
-    backgroundColor: theme.colors.surfaceVariant,
-    borderRadius: theme.roundness,
-    padding: spacing.sm,
+    paddingVertical: spacing.md,
     gap: spacing.xs,
   },
-  responseHeader: {
+  placeholderText: {
+    fontSize: 12,
+    color: TEXT_GRAY,
+  },
+  fieldRow: {
+    gap: 4,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    color: TEXT_GRAY,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  flatInput: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+  },
+  updateBtn: {
+    marginTop: spacing.xs,
+    borderRadius: 8,
+    borderColor: PRIMARY,
+  },
+  updateBtnContent: {
+    paddingVertical: 4,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: SURFACE,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_COLOR,
+  },
+  bottomBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: 13,
+    borderRadius: 10,
   },
-  responderName: {
-    ...typography.label,
+  completeBtn: {
+    backgroundColor: SUCCESS_GREEN,
+  },
+  completeBtnText: {
+    fontSize: 14,
     fontWeight: '700',
-    color: theme.colors.primary,
+    color: '#FFFFFF',
   },
-  responseTime: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
+  rejectBtn: {
+    backgroundColor: SURFACE,
+    borderWidth: 1.5,
+    borderColor: ERROR_RED,
   },
-  responseMsg: {
-    ...typography.body,
-    color: theme.colors.onSurface,
+  rejectBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: ERROR_RED,
   },
 });

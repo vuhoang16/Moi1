@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking, Image, TouchableOpacity } from 'react-native';
-import { Text, Card, Button, ActivityIndicator, Divider } from 'react-native-paper';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Alert,
+  Linking,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
+import { Text, ActivityIndicator, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
@@ -18,10 +26,16 @@ interface QRData {
   amount: number;
 }
 
-const STATUS_COLOR: Record<InvoiceStatus, string> = {
-  chua_thanh_toan: '#E67E22',
-  da_thanh_toan: '#27AE60',
-  qua_han: '#C0392B',
+const STATUS_BG: Record<InvoiceStatus, string> = {
+  chua_thanh_toan: '#FFCDD2',
+  da_thanh_toan: '#C8E6C9',
+  qua_han: '#EF5350',
+};
+
+const STATUS_TEXT_COLOR: Record<InvoiceStatus, string> = {
+  chua_thanh_toan: '#C62828',
+  da_thanh_toan: '#2E7D32',
+  qua_han: '#FFFFFF',
 };
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
@@ -30,14 +44,14 @@ const STATUS_LABEL: Record<InvoiceStatus, string> = {
   qua_han: 'Quá Hạn',
 };
 
-const money = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
+const money = (n: number) => n.toLocaleString('vi-VN') + ' đ';
 
 export default function InvoiceDetailScreen({ route }: any) {
   const { id } = route.params;
   const user = useAuthStore((s) => s.user);
   const { data: invoice, isLoading, refetch } = useInvoice(id);
   const initiatePayment = useInitiatePayment();
-  const [method, setMethod] = useState<PaymentMethod>('momo');
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('vietqr');
   const [qrData, setQrData] = useState<QRData | null>(null);
   const { paymentReturnStatus, clearPaymentReturnStatus } = usePaymentReturn();
 
@@ -51,8 +65,8 @@ export default function InvoiceDetailScreen({ route }: any) {
 
   const pay = async () => {
     try {
-      const result = await initiatePayment.mutateAsync({ invoiceId: id, method });
-      if (method === 'vietqr' && result.qrCodeUrl) {
+      const result = await initiatePayment.mutateAsync({ invoiceId: id, method: selectedMethod });
+      if (selectedMethod === 'vietqr' && result.qrCodeUrl) {
         setQrData({
           qrCodeUrl: result.qrCodeUrl,
           transferRef: result.payment?.gatewayOrderId ?? '',
@@ -72,163 +86,144 @@ export default function InvoiceDetailScreen({ route }: any) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
 
-        {/* Room + period subtitle */}
-        <Text style={styles.subtitle}>
-          {invoice.billingMonth}
-        </Text>
-
         {/* Payment return banner */}
         {paymentReturnStatus && (
-          <Card
+          <View
             style={[
-              styles.card,
+              styles.returnBanner,
               { backgroundColor: paymentReturnStatus === 'success' ? '#D5F5E3' : '#FDEBD0' },
             ]}
           >
-            <Card.Content style={styles.returnBanner}>
-              <Text style={styles.returnIcon}>
-                {paymentReturnStatus === 'success' ? '✅' : '❌'}
-              </Text>
-              <Text style={styles.returnText}>
-                {paymentReturnStatus === 'success'
-                  ? 'Thanh toán thành công! Hóa đơn đang được cập nhật.'
-                  : 'Giao dịch không thành công. Vui lòng thử lại.'}
-              </Text>
-              <Button compact onPress={clearPaymentReturnStatus}>Đóng</Button>
-            </Card.Content>
-          </Card>
+            <Text style={styles.returnIcon}>
+              {paymentReturnStatus === 'success' ? '✅' : '❌'}
+            </Text>
+            <Text style={styles.returnText}>
+              {paymentReturnStatus === 'success'
+                ? 'Thanh toán thành công! Hóa đơn đang được cập nhật.'
+                : 'Giao dịch không thành công. Vui lòng thử lại.'}
+            </Text>
+            <TouchableOpacity onPress={clearPaymentReturnStatus} style={styles.returnClose}>
+              <Text style={styles.returnCloseText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* Status badge */}
-        <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[status] }]}>
-            <Text style={styles.statusLabel}>{STATUS_LABEL[status]}</Text>
+        {/* Top section: room name + badge row, then month subtitle */}
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.roomName}>
+              {invoice.roomName ?? `Phòng ${invoice.roomId}`}
+            </Text>
+            <Text style={styles.monthText}>{invoice.billingMonth}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: STATUS_BG[status] }]}>
+            <Text style={[styles.statusLabel, { color: STATUS_TEXT_COLOR[status] }]}>
+              {STATUS_LABEL[status]}
+            </Text>
           </View>
         </View>
 
-        {/* Billing breakdown card */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <BillingRow label="Tiền thuê" value={money(invoice.baseRent)} />
-            <BillingRow label="Tiền điện" value={money(invoice.electricityAmount)} />
-            <BillingRow label="Tiền nước" value={money(invoice.waterAmount)} />
-            {otherFees.filter((f: any) => f.amount > 0).map((f: any, i: number) => (
-              <BillingRow key={i} label={f.name} value={money(f.amount)} />
-            ))}
-            <Divider style={styles.divider} />
-            <BillingRow label="Tổng cộng" value={money(invoice.totalAmount)} bold />
-          </Card.Content>
-        </Card>
-
-        {/* Due date row */}
-        <View style={styles.dueDateRow}>
-          <MaterialCommunityIcons
-            name="calendar-outline"
-            size={18}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text style={styles.dueDateText}>
-            Hạn thanh toán: {dayjs(invoice.dueDate).format('DD/MM/YYYY')}
-          </Text>
+        {/* Billing table — no card border, rows with lines */}
+        <View style={styles.billingTable}>
+          <BillingRow label="Tiền thuê" value={money(invoice.baseRent)} />
+          <BillingRow label="Tiền điện" value={money(invoice.electricityAmount)} />
+          <BillingRow label="Tiền nước" value={money(invoice.waterAmount)} />
+          {otherFees.filter((f: any) => f.amount > 0).map((f: any, i: number) => (
+            <BillingRow key={i} label={f.name} value={money(f.amount)} />
+          ))}
+          <Divider style={styles.divider} />
+          <BillingRow label="Tổng cộng" value={money(invoice.totalAmount)} bold />
         </View>
-
-        {/* Utility meter readings card */}
-        <Card style={styles.card}>
-          <Card.Title title="Chỉ số điện nước" titleStyle={styles.cardTitle} />
-          <Card.Content>
-            <BillingRow
-              label={`Điện (${invoice.electricityUsage} kWh)`}
-              value={money(invoice.electricityAmount)}
-            />
-            <BillingRow
-              label={`Nước (${invoice.waterUsage} m³)`}
-              value={money(invoice.waterAmount)}
-            />
-          </Card.Content>
-        </Card>
 
         {/* Paid confirmation */}
         {status === 'da_thanh_toan' && invoice.paidAt && (
           <View style={styles.paidRow}>
-            <MaterialCommunityIcons name="check-circle" size={28} color="#27AE60" />
+            <MaterialCommunityIcons name="check-circle" size={22} color="#2E7D32" />
             <Text style={styles.paidText}>
               Đã thanh toán lúc {dayjs(invoice.paidAt).format('DD/MM/YYYY HH:mm')}
             </Text>
           </View>
         )}
 
-        {/* Payment section */}
-        {canPay && !qrData && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text style={styles.paymentHeading}>Chọn phương thức thanh toán</Text>
-              <View style={styles.paymentOptionsRow}>
-                <PaymentOption
-                  label="MoMo"
-                  icon="cellphone"
-                  color="#A93DE6"
-                  selected={method === 'momo'}
-                  onPress={() => setMethod('momo')}
-                />
-                <PaymentOption
-                  label="ZaloPay"
-                  icon="lightning-bolt"
-                  color="#0068FF"
-                  selected={method === 'zalopay'}
-                  onPress={() => setMethod('zalopay')}
-                />
-                <PaymentOption
-                  label="VietQR"
-                  icon="qrcode"
-                  color="#0F8B8D"
-                  selected={method === 'vietqr'}
-                  onPress={() => setMethod('vietqr')}
-                />
-              </View>
-            </Card.Content>
-            <Card.Actions style={styles.cardActions}>
-              <Button
-                mode="contained"
-                onPress={pay}
-                loading={initiatePayment.isPending}
-                style={styles.payButton}
-                contentStyle={styles.payButtonContent}
-              >
-                Thanh Toán
-              </Button>
-            </Card.Actions>
-          </Card>
+        {/* Payment method selection */}
+        {canPay && (
+          <>
+            <Text style={styles.paymentHeading}>Chọn Phương Thức Thanh Toán</Text>
+            <View style={styles.paymentMethodRow}>
+              <PaymentMethodButton
+                id="momo"
+                label="MoMo"
+                letter="M"
+                circleColor="#A93DE6"
+                selected={selectedMethod === 'momo'}
+                onPress={() => setSelectedMethod('momo')}
+              />
+              <PaymentMethodButton
+                id="zalopay"
+                label="ZaloPay"
+                letter="Z"
+                circleColor="#0068FF"
+                selected={selectedMethod === 'zalopay'}
+                onPress={() => setSelectedMethod('zalopay')}
+              />
+              <PaymentMethodButton
+                id="vietqr"
+                label="VietQR"
+                letter="Q"
+                circleColor="#0F8B8D"
+                selected={selectedMethod === 'vietqr'}
+                onPress={() => setSelectedMethod('vietqr')}
+                useQrIcon
+              />
+            </View>
+          </>
         )}
 
-        {/* VietQR display */}
+        {/* QR display section — shown when vietqr selected */}
+        {canPay && selectedMethod === 'vietqr' && (
+          <View style={styles.qrSection}>
+            {qrData ? (
+              <>
+                <Image
+                  source={{ uri: qrData.qrCodeUrl }}
+                  style={styles.qrImage}
+                  resizeMode="contain"
+                />
+              </>
+            ) : (
+              <View style={styles.qrPlaceholder}>
+                <MaterialCommunityIcons name="qrcode" size={120} color={theme.colors.onSurfaceVariant} />
+              </View>
+            )}
+            <Text style={styles.bankName}>MB Bank</Text>
+            <Text style={styles.accountNumber}>12345878</Text>
+            <Text style={styles.holderName}>NGUYEN VAN A</Text>
+          </View>
+        )}
+
+        {/* CTA button */}
+        {canPay && (
+          <TouchableOpacity
+            style={styles.ctaButton}
+            onPress={pay}
+            activeOpacity={0.8}
+            disabled={initiatePayment.isPending}
+          >
+            <Text style={styles.ctaButtonText}>
+              {initiatePayment.isPending ? 'Đang xử lý...' : 'Đã Chuyển Khoản →'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Show done button after QR displayed */}
         {qrData && (
-          <Card style={styles.card}>
-            <Card.Title title="Quét mã VietQR để chuyển khoản" titleStyle={styles.cardTitle} />
-            <Card.Content style={styles.qrContainer}>
-              <Image
-                source={{ uri: qrData.qrCodeUrl }}
-                style={styles.qrImage}
-                resizeMode="contain"
-              />
-              <Text style={styles.qrAmount}>{money(qrData.amount)}</Text>
-              {!!qrData.transferRef && (
-                <View style={styles.transferRefBox}>
-                  <Text style={styles.transferRefLabel}>Nội dung chuyển khoản</Text>
-                  <Text style={styles.transferRefValue}>{qrData.transferRef}</Text>
-                </View>
-              )}
-              <Text style={styles.qrHint}>
-                Mở app ngân hàng → Quét mã QR → Kiểm tra thông tin → Xác nhận
-              </Text>
-              <Button
-                mode="contained-tonal"
-                onPress={() => { setQrData(null); refetch(); }}
-                style={{ marginTop: spacing.md }}
-              >
-                Đã chuyển khoản xong
-              </Button>
-            </Card.Content>
-          </Card>
+          <TouchableOpacity
+            style={styles.doneButton}
+            onPress={() => { setQrData(null); refetch(); }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.doneButtonText}>Đã chuyển khoản xong</Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -252,30 +247,35 @@ function BillingRow({
   );
 }
 
-function PaymentOption({
+function PaymentMethodButton({
   label,
-  icon,
-  color,
+  letter,
+  circleColor,
   selected,
   onPress,
+  useQrIcon,
 }: {
+  id: string;
   label: string;
-  icon: string;
-  color: string;
+  letter: string;
+  circleColor: string;
   selected: boolean;
   onPress: () => void;
+  useQrIcon?: boolean;
 }) {
   return (
-    <TouchableOpacity
-      style={[
-        paymentStyles.card,
-        selected && { borderColor: color, backgroundColor: color + '14' },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <MaterialCommunityIcons name={icon as any} size={28} color={color} />
-      <Text style={[paymentStyles.label, selected && { color }]}>{label}</Text>
+    <TouchableOpacity style={pmStyles.item} onPress={onPress} activeOpacity={0.7}>
+      <View style={[pmStyles.circle, { backgroundColor: circleColor }]}>
+        {useQrIcon ? (
+          <MaterialCommunityIcons name="qrcode" size={22} color="#FFFFFF" />
+        ) : (
+          <Text style={pmStyles.letter}>{letter}</Text>
+        )}
+      </View>
+      <Text style={[pmStyles.label, selected && pmStyles.labelSelected]}>{label}</Text>
+      {selected && (
+        <View style={pmStyles.checkDot} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -285,157 +285,208 @@ const rowStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.sm + 2,
   },
-  label: { ...typography.body, color: theme.colors.onSurfaceVariant, flex: 1 },
-  value: { ...typography.body, textAlign: 'right' },
-  boldLabel: { ...typography.headingSmall, color: theme.colors.onSurface },
+  label: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+    flex: 1,
+  },
+  value: {
+    ...typography.body,
+    color: theme.colors.onSurface,
+    textAlign: 'right',
+  },
+  boldLabel: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: theme.colors.onSurface,
+  },
   boldValue: {
-    ...typography.headingSmall,
+    fontSize: 20,
+    fontWeight: '700' as const,
     color: theme.colors.primary,
     textAlign: 'right',
   },
 });
 
-const paymentStyles = StyleSheet.create({
-  card: {
+const pmStyles = StyleSheet.create({
+  item: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    marginHorizontal: spacing.xs,
-    borderWidth: 1.5,
-    borderColor: theme.colors.surfaceVariant,
-    borderRadius: theme.roundness,
     gap: spacing.xs,
   },
+  circle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  letter: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
   label: {
-    ...typography.label,
+    ...typography.bodySmall,
     color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
+  },
+  labelSelected: {
+    color: theme.colors.onSurface,
+    fontWeight: '600' as const,
+  },
+  checkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
   },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   loader: { flex: 1 },
-  content: { padding: spacing.lg, gap: spacing.md },
-
-  subtitle: {
-    ...typography.body,
-    color: theme.colors.onSurfaceVariant,
-    textAlign: 'center',
-  },
-
-  statusRow: {
-    alignItems: 'center',
-    marginVertical: spacing.xs,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-    borderRadius: 50,
-  },
-  statusLabel: {
-    ...typography.headingSmall,
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-
-  card: {
-    borderRadius: theme.roundness,
-    backgroundColor: theme.colors.surface,
-  },
-  cardTitle: { ...typography.headingSmall },
-  cardActions: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
-
-  divider: {
-    marginVertical: spacing.sm,
-    backgroundColor: theme.colors.surfaceVariant,
-  },
-
-  dueDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xs,
-  },
-  dueDateText: {
-    ...typography.body,
-    color: theme.colors.onSurfaceVariant,
-  },
-
-  paidRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: '#D5F5E3',
-    borderRadius: theme.roundness,
-    padding: spacing.md,
-  },
-  paidText: {
-    ...typography.body,
-    color: '#1E8449',
-    flex: 1,
-  },
-
-  paymentHeading: {
-    ...typography.headingSmall,
-    color: theme.colors.onSurface,
-    marginBottom: spacing.md,
-  },
-  paymentOptionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  payButton: {
-    flex: 1,
-    borderRadius: theme.roundness,
-  },
-  payButtonContent: {
-    paddingVertical: spacing.xs,
+  content: {
+    padding: spacing.lg,
+    gap: spacing.lg,
   },
 
   returnBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    borderRadius: theme.roundness,
+    padding: spacing.md,
     flexWrap: 'wrap',
   },
-  returnIcon: { fontSize: 20 },
+  returnIcon: { fontSize: 18 },
   returnText: { ...typography.body, flex: 1 },
+  returnClose: { paddingHorizontal: spacing.sm },
+  returnCloseText: { ...typography.body, color: theme.colors.primary, fontWeight: '600' as const },
 
-  qrContainer: { alignItems: 'center', paddingVertical: spacing.md },
-  qrImage: { width: 220, height: 220, borderRadius: spacing.sm },
-  qrAmount: {
-    ...typography.headingMedium,
-    color: theme.colors.primary,
-    marginTop: spacing.md,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  transferRefBox: {
-    marginTop: spacing.sm,
-    backgroundColor: theme.colors.surfaceVariant,
-    borderRadius: spacing.sm,
-    padding: spacing.sm,
-    alignItems: 'center',
-    width: '100%',
+  headerLeft: {
+    flex: 1,
+    gap: 2,
   },
-  transferRefLabel: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
-    marginBottom: 2,
-  },
-  transferRefValue: {
-    ...typography.body,
-    fontWeight: '600',
+  roomName: {
+    fontSize: 16,
+    fontWeight: '700' as const,
     color: theme.colors.onSurface,
-    textAlign: 'center',
+    lineHeight: 22,
   },
-  qrHint: {
-    ...typography.bodySmall,
+  monthText: {
+    ...typography.body,
     color: theme.colors.onSurfaceVariant,
-    textAlign: 'center',
-    marginTop: spacing.md,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 50,
+    alignSelf: 'flex-start',
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
     lineHeight: 18,
+  },
+
+  billingTable: {
+    backgroundColor: '#FFFFFF',
+  },
+  divider: {
+    marginVertical: spacing.sm,
+    backgroundColor: '#E0E0E0',
+    height: 1,
+  },
+
+  paidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#C8E6C9',
+    borderRadius: theme.roundness,
+    padding: spacing.md,
+  },
+  paidText: {
+    ...typography.body,
+    color: '#2E7D32',
+    flex: 1,
+  },
+
+  paymentHeading: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: theme.colors.onSurface,
+    lineHeight: 22,
+  },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+  },
+
+  qrSection: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  qrPlaceholder: {
+    width: 160,
+    height: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: spacing.sm,
+  },
+  qrImage: {
+    width: 160,
+    height: 200,
+    borderRadius: spacing.sm,
+  },
+  bankName: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: theme.colors.onSurface,
+    marginTop: spacing.sm,
+  },
+  accountNumber: {
+    ...typography.body,
+    color: theme.colors.onSurface,
+  },
+  holderName: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+  },
+
+  ctaButton: {
+    backgroundColor: '#B2DFDB',
+    borderRadius: theme.roundness,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  ctaButtonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: theme.colors.onSurface,
+  },
+
+  doneButton: {
+    borderRadius: theme.roundness,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceVariant,
+  },
+  doneButtonText: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+    fontWeight: '600' as const,
   },
 });

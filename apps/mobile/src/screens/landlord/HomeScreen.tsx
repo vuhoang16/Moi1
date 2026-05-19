@@ -1,5 +1,12 @@
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  Image,
+  Dimensions,
+} from 'react-native';
 import { Text, ActivityIndicator, Avatar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,16 +14,23 @@ import dayjs from 'dayjs';
 import { useAuthStore } from '../../store/auth.store';
 import { useProperties } from '../../queries/properties';
 import { useInvoices } from '../../queries/invoices';
-import { theme, spacing, typography } from '../../theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Dark noir palette — matching Stitch mockup
+const C = {
+  bg: '#0A1628',
+  surface: '#111F35',
+  surfaceLight: '#162640',
+  text: '#FFFFFF',
+  textMuted: 'rgba(255,255,255,0.55)',
+  textSub: 'rgba(255,255,255,0.35)',
+  accent: '#00BFA5',
+  amber: '#F5A623',
+  divider: 'rgba(255,255,255,0.1)',
+};
 
 const formatVND = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
-
-function getGreeting(): string {
-  const h = dayjs().hour();
-  if (h < 12) return 'Chào buổi sáng';
-  if (h < 18) return 'Chào buổi chiều';
-  return 'Chào buổi tối';
-}
 
 export default function LandlordHomeScreen({ navigation }: any) {
   const user = useAuthStore((s) => s.user);
@@ -24,7 +38,6 @@ export default function LandlordHomeScreen({ navigation }: any) {
   const { data: invoices, isLoading: loadingInvs } = useInvoices();
 
   const isLoading = loadingProps || loadingInvs;
-
   const currentMonth = dayjs().month();
   const currentYear = dayjs().year();
 
@@ -34,415 +47,281 @@ export default function LandlordHomeScreen({ navigation }: any) {
   });
 
   const totalRevenue = currentMonthInvoices.reduce(
-    (sum: number, inv: any) => sum + (inv.totalAmount ?? 0),
-    0,
+    (s: number, inv: any) => s + (inv.totalAmount ?? 0), 0,
   );
   const collected = currentMonthInvoices
     .filter((inv: any) => inv.status === 'da_thanh_toan')
-    .reduce((sum: number, inv: any) => sum + (inv.totalAmount ?? 0), 0);
+    .reduce((s: number, inv: any) => s + (inv.totalAmount ?? 0), 0);
   const pending = currentMonthInvoices
-    .filter((inv: any) => inv.status === 'chua_thanh_toan' || inv.status === 'qua_han')
-    .reduce((sum: number, inv: any) => sum + (inv.totalAmount ?? 0), 0);
+    .filter((inv: any) => ['chua_thanh_toan', 'qua_han'].includes(inv.status))
+    .reduce((s: number, inv: any) => s + (inv.totalAmount ?? 0), 0);
 
   const items: any[] = propertiesData?.items ?? [];
-  const totalRooms = items.reduce((sum: number, p: any) => sum + (p._count?.rooms ?? 0), 0);
-  const occupiedRooms = items.reduce(
-    (sum: number, p: any) => sum + (p._count?.occupiedRooms ?? 0),
-    0,
-  );
+  const totalRooms = items.reduce((s: number, p: any) => s + (p._count?.rooms ?? 0), 0);
+  const occupiedRooms = items.reduce((s: number, p: any) => s + (p._count?.occupiedRooms ?? 0), 0);
   const vacantRooms = totalRooms - occupiedRooms;
 
   const unpaidCount = (invoices ?? []).filter(
-    (inv: any) => inv.status === 'chua_thanh_toan' || inv.status === 'qua_han',
+    (inv: any) => ['chua_thanh_toan', 'qua_han'].includes(inv.status),
   ).length;
 
   const initials = (user?.fullName ?? '')
-    .split(' ')
-    .map((w: string) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+    .split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   const monthLabel = dayjs().format('M/YYYY');
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.fullName ?? ''}!</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.bellWrap}
-              onPress={() => navigation.navigate('Notifications')}
-            >
-              <MaterialCommunityIcons name="bell-outline" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-              {user?.avatarUrl ? (
-                <Avatar.Image size={42} source={{ uri: user.avatarUrl }} />
-              ) : (
-                <Avatar.Text
-                  size={42}
-                  label={initials || '?'}
-                  style={styles.avatar}
-                  labelStyle={styles.avatarLabel}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+    <SafeAreaView style={s.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-        {/* Financial Summary Card */}
-        <View style={styles.financialCard}>
-          <Text style={styles.financialTitle}>TỔNG THU THÁNG {monthLabel}</Text>
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" style={styles.cardLoader} />
-          ) : (
-            <View style={styles.metricsRow}>
-              <View style={styles.metricCol}>
-                <Text style={styles.metricLabel}>Tổng thu</Text>
-                <Text style={styles.metricValue}>{formatVND(totalRevenue)}</Text>
-              </View>
-              <View style={styles.metricDivider} />
-              <View style={styles.metricCol}>
-                <Text style={styles.metricLabel}>Đã thu</Text>
-                <Text style={styles.metricValue}>{formatVND(collected)}</Text>
-              </View>
-              <View style={styles.metricDivider} />
-              <View style={styles.metricCol}>
-                <Text style={styles.metricLabel}>Chờ TT</Text>
-                <Text style={[styles.metricValue, styles.pendingValue]}>{formatVND(pending)}</Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Property Overview chips */}
-        <View style={styles.statsRow}>
-          <View style={styles.statChip}>
-            <Text style={styles.statIcon}>🏠</Text>
-            <Text style={styles.statValue}>{isLoading ? '—' : totalRooms}</Text>
-            <Text style={styles.statChipLabel}>Tổng phòng</Text>
-          </View>
-          <View style={styles.statChip}>
-            <Text style={styles.statIcon}>✅</Text>
-            <Text style={[styles.statValue, { color: '#27AE60' }]}>
-              {isLoading ? '—' : occupiedRooms}
-            </Text>
-            <Text style={styles.statChipLabel}>Đang thuê</Text>
-          </View>
-          <View style={styles.statChip}>
-            <Text style={styles.statIcon}>🔑</Text>
-            <Text style={[styles.statValue, { color: theme.colors.secondary }]}>
-              {isLoading ? '—' : vacantRooms}
-            </Text>
-            <Text style={styles.statChipLabel}>Còn trống</Text>
-          </View>
-        </View>
-
-        {/* Action Items */}
-        <View style={styles.actionSection}>
-          <View style={styles.actionHeader}>
-            <MaterialCommunityIcons
-              name="alert-circle-outline"
-              size={20}
-              color={theme.colors.secondary}
-            />
-            <Text style={styles.actionTitle}>Cần xử lý hôm nay</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => navigation.navigate('Contracts')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionLeft}>
-              <Text style={styles.actionIcon}>⚠️</Text>
-              <Text style={styles.actionText}>
-                {isLoading ? '...' : unpaidCount} hóa đơn chưa thanh toán
-              </Text>
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={22}
-              color={theme.colors.onSurfaceVariant}
-            />
+        {/* ── Header ── */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            {user?.avatarUrl
+              ? <Avatar.Image size={40} source={{ uri: user.avatarUrl }} />
+              : <Avatar.Text size={40} label={initials || '?'} style={s.avatar} labelStyle={s.avatarLabel} />}
           </TouchableOpacity>
 
-          <View style={styles.rowDivider} />
-
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => navigation.navigate('Contracts')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionLeft}>
-              <Text style={styles.actionIcon}>🔧</Text>
-              <Text style={styles.actionText}>Yêu cầu sửa chữa mới</Text>
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={22}
-              color={theme.colors.onSurfaceVariant}
-            />
+          <TouchableOpacity style={s.brandRow} onPress={() => navigation.navigate('Notifications')}>
+            <MaterialCommunityIcons name="home-city" size={16} color={C.accent} />
+            <Text style={s.brandText}>  DIGITAL CONCIERGE</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Property cards */}
-        <View style={styles.propertiesSection}>
-          <View style={styles.propertiesHeader}>
-            <Text style={styles.propertiesTitle}>Bất động sản của bạn</Text>
+        {/* ── Financial hero ── */}
+        <View style={s.heroSection}>
+          <Text style={s.heroLabel}>TỔNG THU THÁNG {monthLabel}</Text>
+          {isLoading
+            ? <ActivityIndicator color={C.accent} style={{ marginVertical: 16 }} />
+            : <>
+                <Text style={s.heroAmount}>{totalRevenue.toLocaleString('vi-VN')}</Text>
+                <Text style={s.heroCurrency}>₫</Text>
+                <View style={s.heroSubRow}>
+                  <View style={s.heroSubItem}>
+                    <Text style={s.heroSubLabel}>Đã thu</Text>
+                    <Text style={s.heroSubValue}>{collected.toLocaleString('vi-VN')} ₫</Text>
+                  </View>
+                  <View style={s.heroSubDivider} />
+                  <View style={s.heroSubItem}>
+                    <Text style={s.heroSubLabel}>Chờ thanh toán</Text>
+                    <Text style={[s.heroSubValue, { color: C.amber }]}>{pending.toLocaleString('vi-VN')} ₫</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={s.payBtn}
+                  onPress={() => navigation.navigate('Contracts')}
+                >
+                  <Text style={s.payBtnText}>THANH TOÁN</Text>
+                </TouchableOpacity>
+              </>
+          }
+        </View>
+
+        {/* ── Stats ── */}
+        <View style={s.statsRow}>
+          {[
+            { icon: 'home-city-outline', value: totalRooms, label: 'Tổng phòng' },
+            { icon: 'account-check', value: occupiedRooms, label: 'Đang thuê' },
+            { icon: 'door-open', value: vacantRooms, label: 'Còn trống' },
+          ].map((stat, i) => (
+            <View key={i} style={[s.statItem, i < 2 && s.statBorder]}>
+              <MaterialCommunityIcons name={stat.icon as any} size={22} color={C.accent} />
+              <Text style={s.statValue}>{isLoading ? '—' : stat.value}</Text>
+              <Text style={s.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Action items ── */}
+        <View style={s.actionCard}>
+          <Text style={s.actionHeading}>Cần xử lý hôm nay</Text>
+
+          <TouchableOpacity style={s.actionRow} onPress={() => navigation.navigate('Contracts')}>
+            <View style={s.actionIconWrap}>
+              <MaterialCommunityIcons name="receipt" size={18} color={C.amber} />
+            </View>
+            <View style={s.actionInfo}>
+              <Text style={s.actionText}>{isLoading ? '...' : unpaidCount} hóa đơn chưa thanh toán</Text>
+              <Text style={s.actionSub}>Hạn chót: Hôm nay</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={C.textMuted} />
+          </TouchableOpacity>
+
+          <View style={s.actionDivider} />
+
+          <TouchableOpacity style={s.actionRow} onPress={() => navigation.navigate('Contracts')}>
+            <View style={s.actionIconWrap}>
+              <MaterialCommunityIcons name="wrench" size={18} color="#EF5350" />
+            </View>
+            <View style={s.actionInfo}>
+              <Text style={s.actionText}>2 yêu cầu sửa chữa mới</Text>
+              <Text style={s.actionSub}>Phòng 101, 102</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={C.textMuted} />
+          </TouchableOpacity>
+
+          <View style={s.actionDivider} />
+
+          <TouchableOpacity style={s.actionRow} onPress={() => navigation.navigate('Reports')}>
+            <View style={[s.actionIconWrap, { backgroundColor: 'rgba(0,191,165,0.15)' }]}>
+              <MaterialCommunityIcons name="trending-up" size={18} color={C.accent} />
+            </View>
+            <View style={s.actionInfo}>
+              <Text style={s.actionText}>Tỉ lệ lấp đầy tăng 12%</Text>
+              <Text style={s.actionSub}>Xem báo cáo chi tiết</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={C.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Property list ── */}
+        <View style={s.listSection}>
+          <View style={s.listHeader}>
+            <Text style={s.listTitle}>Danh sách bất động sản</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Properties')}>
-              <Text style={styles.viewAllLink}>Xem tất cả</Text>
+              <Text style={s.listAll}>Xem tất cả</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.propertyCardsRow}
-          >
-            {isLoading ? (
-              <ActivityIndicator style={{ marginVertical: spacing.md }} />
-            ) : items.length === 0 ? (
-              <Text style={styles.emptyText}>Chưa có bất động sản nào</Text>
-            ) : (
-              items.map((property: any) => {
-                const total = property._count?.rooms ?? 0;
-                const occupied = property._count?.occupiedRooms ?? 0;
-                const pct = total > 0 ? Math.round((occupied / total) * 100) : 0;
-                const coverImg = property.imageUrls?.[0] ?? property.coverImage ?? null;
+          {isLoading
+            ? <ActivityIndicator color={C.accent} />
+            : items.map((p: any) => {
+                const total = p._count?.rooms ?? 0;
+                const occ = p._count?.occupiedRooms ?? 0;
+                const pct = total > 0 ? Math.round((occ / total) * 100) : 0;
+                const img = p.imageUrls?.[0] ?? null;
                 return (
                   <TouchableOpacity
-                    key={property.id}
-                    style={styles.propertyCard}
+                    key={p.id}
+                    style={s.propCard}
+                    onPress={() => navigation.navigate('PropertyDetail', { id: p.id })}
                     activeOpacity={0.8}
-                    onPress={() => navigation.navigate('PropertyDetail', { id: property.id })}
                   >
-                    {coverImg ? (
-                      <Image
-                        source={{ uri: coverImg }}
-                        style={styles.propertyCardImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={[styles.propertyCardImage, styles.propertyCardImagePlaceholder]}>
-                        <MaterialCommunityIcons
-                          name="office-building"
-                          size={36}
-                          color={theme.colors.primary}
-                        />
+                    {img
+                      ? <Image source={{ uri: img }} style={s.propImg} resizeMode="cover" />
+                      : <View style={[s.propImg, s.propImgPlaceholder]}>
+                          <MaterialCommunityIcons name="office-building" size={40} color={C.accent} />
+                        </View>
+                    }
+                    <View style={s.propOverlay}>
+                      <Text style={s.propName} numberOfLines={1}>{p.name}</Text>
+                      <Text style={s.propAddr} numberOfLines={1}>
+                        {[p.district, p.city].filter(Boolean).join(', ') || p.address}
+                      </Text>
+                      <View style={s.propMeta}>
+                        <Text style={s.propPct}>{pct}%</Text>
+                        <Text style={s.propRooms}>Phòng {occ}/{total}</Text>
                       </View>
-                    )}
-                    <View style={styles.propertyCardBody}>
-                      <Text style={styles.propertyCardName} numberOfLines={1}>
-                        {property.name}
-                      </Text>
-                      <Text style={styles.propertyCardAddress} numberOfLines={1}>
-                        {[property.district, property.city].filter(Boolean).join(', ') || property.address}
-                      </Text>
-                      <Text style={styles.propertyCardRooms}>
-                        {`🏠 ${total} phòng · ${occupied}/${total}`}
-                      </Text>
-                      <Text style={[styles.propertyCardOccupancy, { color: theme.colors.secondary }]}>
-                        {`Lấp đầy ${pct}%`}
-                      </Text>
                     </View>
                   </TouchableOpacity>
                 );
               })
-            )}
-          </ScrollView>
+          }
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingBottom: 32 },
 
-  headerRow: {
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  headerLeft: { flex: 1 },
-  greeting: { ...typography.body, color: theme.colors.onSurfaceVariant },
-  userName: { ...typography.headingMedium, color: theme.colors.primary },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  bellWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatar: { backgroundColor: theme.colors.primary },
-  avatarLabel: { color: '#FFFFFF', fontWeight: '700' },
+  avatar: { backgroundColor: '#1B4F72' },
+  avatarLabel: { color: '#FFF', fontWeight: '700' },
+  brandRow: { flexDirection: 'row', alignItems: 'center' },
+  brandText: { fontSize: 12, fontWeight: '700', color: C.textMuted, letterSpacing: 1 },
 
-  financialCard: {
-    backgroundColor: '#1B4F72',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: spacing.md,
-    shadowColor: '#1B4F72',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  financialTitle: {
-    ...typography.label,
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: spacing.md,
-    letterSpacing: 0.8,
-  },
-  cardLoader: { marginVertical: spacing.md },
-  metricsRow: {
-    flexDirection: 'row',
+  // Hero
+  heroSection: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 },
+  heroLabel: { fontSize: 11, fontWeight: '600', color: C.textMuted, letterSpacing: 1.2, marginBottom: 8 },
+  heroAmount: { fontSize: 44, fontWeight: '800', color: C.text, lineHeight: 52 },
+  heroCurrency: { fontSize: 20, fontWeight: '700', color: C.textMuted, marginTop: -4, marginBottom: 16 },
+  heroSubRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  heroSubItem: { flex: 1 },
+  heroSubLabel: { fontSize: 11, color: C.textMuted, marginBottom: 2 },
+  heroSubValue: { fontSize: 14, fontWeight: '600', color: C.text },
+  heroSubDivider: { width: 1, height: 32, backgroundColor: C.divider, marginHorizontal: 16 },
+  payBtn: {
+    backgroundColor: C.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 28,
   },
-  metricCol: { flex: 1, alignItems: 'center' },
-  metricDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-  },
-  metricLabel: {
-    ...typography.bodySmall,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: spacing.xs,
-  },
-  metricValue: {
-    ...typography.headingSmall,
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  pendingValue: { color: '#F0A500' },
+  payBtnText: { fontSize: 13, fontWeight: '700', color: '#FFF', letterSpacing: 0.8 },
 
+  // Stats
   statsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    backgroundColor: C.surface,
+    marginHorizontal: 20,
+    borderRadius: 14,
+    marginTop: 20,
+    marginBottom: 16,
+    paddingVertical: 18,
   },
-  statChip: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statIcon: { fontSize: 18, marginBottom: spacing.xs },
-  statValue: { ...typography.headingSmall, color: theme.colors.primary, marginBottom: 2 },
-  statChipLabel: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, textAlign: 'center' },
+  statItem: { flex: 1, alignItems: 'center', gap: 4 },
+  statBorder: { borderRightWidth: 1, borderRightColor: C.divider },
+  statValue: { fontSize: 26, fontWeight: '800', color: C.text },
+  statLabel: { fontSize: 11, color: C.textMuted, textAlign: 'center' },
 
-  actionSection: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.surfaceVariant,
-  },
-  actionTitle: { ...typography.headingSmall, color: theme.colors.secondary },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.secondary,
-  },
-  actionLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  actionIcon: { fontSize: 16, marginRight: spacing.sm },
-  actionText: { ...typography.body, color: theme.colors.onSurface, flex: 1 },
-  rowDivider: { height: 1, backgroundColor: theme.colors.surfaceVariant, marginLeft: spacing.md },
-
-  propertiesSection: {
-    marginTop: spacing.lg,
-  },
-  propertiesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  propertiesTitle: { ...typography.headingSmall, color: theme.colors.onSurface },
-  viewAllLink: { ...typography.body, color: theme.colors.primary, fontWeight: '600' },
-  propertyCardsRow: { gap: 0, paddingRight: spacing.lg },
-  emptyText: { ...typography.body, color: theme.colors.onSurfaceVariant },
-
-  propertyCard: {
-    width: 190,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    marginRight: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+  // Action card
+  actionCard: {
+    backgroundColor: C.surface,
+    marginHorizontal: 20,
+    borderRadius: 14,
+    marginBottom: 24,
+    paddingTop: 14,
     overflow: 'hidden',
   },
-  propertyCardImage: {
-    width: '100%',
-    height: 120,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+  actionHeading: { fontSize: 13, fontWeight: '700', color: C.textMuted, paddingHorizontal: 16, marginBottom: 10, letterSpacing: 0.4 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  actionIconWrap: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: 'rgba(245,166,35,0.15)',
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
-  propertyCardImagePlaceholder: {
-    backgroundColor: theme.colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
+  actionInfo: { flex: 1 },
+  actionText: { fontSize: 14, fontWeight: '600', color: C.text },
+  actionSub: { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  actionDivider: { height: 1, backgroundColor: C.divider, marginLeft: 62 },
+
+  // Property list
+  listSection: { paddingHorizontal: 20 },
+  listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  listTitle: { fontSize: 15, fontWeight: '700', color: C.text },
+  listAll: { fontSize: 12, color: C.accent, fontWeight: '600' },
+
+  propCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 14,
+    height: 160,
+    backgroundColor: C.surface,
   },
-  propertyCardBody: {
-    padding: spacing.sm,
+  propImg: { width: '100%', height: '100%' },
+  propImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  propOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+    padding: 14,
   },
-  propertyCardName: {
-    ...typography.headingSmall,
-    color: theme.colors.onSurface,
-    marginBottom: 2,
-  },
-  propertyCardAddress: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
-    marginBottom: spacing.xs,
-  },
-  propertyCardRooms: {
-    ...typography.bodySmall,
-    color: theme.colors.onSurfaceVariant,
-    marginBottom: 2,
-  },
-  propertyCardOccupancy: {
-    ...typography.bodySmall,
-    fontWeight: '600',
-  },
+  propName: { fontSize: 16, fontWeight: '700', color: '#FFF', marginBottom: 2 },
+  propAddr: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 8 },
+  propMeta: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  propPct: { fontSize: 20, fontWeight: '800', color: C.accent },
+  propRooms: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
 });
