@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking, Image } from 'react-native';
-import { Text, Card, Button, Chip, RadioButton, ActivityIndicator } from 'react-native-paper';
+import { ScrollView, StyleSheet, View, Alert, Linking, Image, TouchableOpacity } from 'react-native';
+import { Text, Card, Button, ActivityIndicator, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { useInvoice, useInitiatePayment } from '../../queries/invoices';
 import { useAuthStore } from '../../store/auth.store';
@@ -22,11 +23,14 @@ const STATUS_COLOR: Record<InvoiceStatus, string> = {
   da_thanh_toan: '#27AE60',
   qua_han: '#C0392B',
 };
+
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
-  chua_thanh_toan: 'Chưa thanh toán',
-  da_thanh_toan: 'Đã thanh toán',
-  qua_han: 'Quá hạn',
+  chua_thanh_toan: 'Chưa Thanh Toán',
+  da_thanh_toan: 'Đã Thanh Toán',
+  qua_han: 'Quá Hạn',
 };
+
+const money = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 
 export default function InvoiceDetailScreen({ route }: any) {
   const { id } = route.params;
@@ -37,14 +41,13 @@ export default function InvoiceDetailScreen({ route }: any) {
   const [qrData, setQrData] = useState<QRData | null>(null);
   const { paymentReturnStatus, clearPaymentReturnStatus } = usePaymentReturn();
 
-  if (isLoading) return <ActivityIndicator style={{ flex: 1 }} />;
+  if (isLoading) return <ActivityIndicator style={styles.loader} />;
   if (!invoice) return null;
-
-  const money = (n: number) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 
   const isTenant = user?.id === invoice.tenantId;
   const canPay = isTenant && invoice.status !== 'da_thanh_toan';
+  const status = invoice.status as InvoiceStatus;
+  const otherFees = (invoice.otherFees as any[]) ?? [];
 
   const pay = async () => {
     try {
@@ -65,11 +68,14 @@ export default function InvoiceDetailScreen({ route }: any) {
     }
   };
 
-  const otherFees = (invoice.otherFees as any[]) ?? [];
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+
+        {/* Room + period subtitle */}
+        <Text style={styles.subtitle}>
+          {invoice.billingMonth}
+        </Text>
 
         {/* Payment return banner */}
         {paymentReturnStatus && (
@@ -93,85 +99,102 @@ export default function InvoiceDetailScreen({ route }: any) {
           </Card>
         )}
 
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>Hóa đơn {invoice.billingMonth}</Text>
-          <Chip
-            style={{ backgroundColor: STATUS_COLOR[invoice.status as InvoiceStatus] + '22' }}
-            textStyle={{ color: STATUS_COLOR[invoice.status as InvoiceStatus] }}
-          >
-            {STATUS_LABEL[invoice.status as InvoiceStatus]}
-          </Chip>
+        {/* Status badge */}
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[status] }]}>
+            <Text style={styles.statusLabel}>{STATUS_LABEL[status]}</Text>
+          </View>
         </View>
 
+        {/* Billing breakdown card */}
         <Card style={styles.card}>
-          <Card.Title title="Chi tiết" />
           <Card.Content>
-            <Row label="Tiền thuê" value={money(invoice.baseRent)} />
-            <Row
+            <BillingRow label="Tiền thuê" value={money(invoice.baseRent)} />
+            <BillingRow label="Tiền điện" value={money(invoice.electricityAmount)} />
+            <BillingRow label="Tiền nước" value={money(invoice.waterAmount)} />
+            {otherFees.filter((f: any) => f.amount > 0).map((f: any, i: number) => (
+              <BillingRow key={i} label={f.name} value={money(f.amount)} />
+            ))}
+            <Divider style={styles.divider} />
+            <BillingRow label="Tổng cộng" value={money(invoice.totalAmount)} bold />
+          </Card.Content>
+        </Card>
+
+        {/* Due date row */}
+        <View style={styles.dueDateRow}>
+          <MaterialCommunityIcons
+            name="calendar-outline"
+            size={18}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text style={styles.dueDateText}>
+            Hạn thanh toán: {dayjs(invoice.dueDate).format('DD/MM/YYYY')}
+          </Text>
+        </View>
+
+        {/* Utility meter readings card */}
+        <Card style={styles.card}>
+          <Card.Title title="Chỉ số điện nước" titleStyle={styles.cardTitle} />
+          <Card.Content>
+            <BillingRow
               label={`Điện (${invoice.electricityUsage} kWh)`}
               value={money(invoice.electricityAmount)}
             />
-            <Row
+            <BillingRow
               label={`Nước (${invoice.waterUsage} m³)`}
               value={money(invoice.waterAmount)}
             />
-            {otherFees.map((f: any, i: number) => (
-              <Row key={i} label={f.name} value={money(f.amount)} />
-            ))}
-            <View style={styles.divider} />
-            <Row label="Tổng cộng" value={money(invoice.totalAmount)} bold />
-            <Row label="Hạn thanh toán" value={dayjs(invoice.dueDate).format('DD/MM/YYYY')} />
-            {invoice.paidAt && (
-              <Row
-                label="Đã thanh toán lúc"
-                value={dayjs(invoice.paidAt).format('DD/MM/YYYY HH:mm')}
-              />
-            )}
           </Card.Content>
         </Card>
 
-        <Card style={styles.card}>
-          <Card.Title title="Chỉ số điện nước" />
-          <Card.Content>
-            <Row label="Điện kỳ trước" value={`${invoice.electricityPrevReading} kWh`} />
-            <Row label="Điện kỳ này" value={`${invoice.electricityCurrentReading} kWh`} />
-            <Row label="Nước kỳ trước" value={`${invoice.waterPrevReading} m³`} />
-            <Row label="Nước kỳ này" value={`${invoice.waterCurrentReading} m³`} />
-          </Card.Content>
-        </Card>
+        {/* Paid confirmation */}
+        {status === 'da_thanh_toan' && invoice.paidAt && (
+          <View style={styles.paidRow}>
+            <MaterialCommunityIcons name="check-circle" size={28} color="#27AE60" />
+            <Text style={styles.paidText}>
+              Đã thanh toán lúc {dayjs(invoice.paidAt).format('DD/MM/YYYY HH:mm')}
+            </Text>
+          </View>
+        )}
 
-        {/* Payment method selector */}
+        {/* Payment section */}
         {canPay && !qrData && (
           <Card style={styles.card}>
-            <Card.Title title="Chọn phương thức thanh toán" />
             <Card.Content>
-              {(
-                [
-                  { value: 'momo', label: 'MoMo' },
-                  { value: 'zalopay', label: 'ZaloPay' },
-                  { value: 'vietqr', label: 'VietQR (chuyển khoản)' },
-                ] as { value: PaymentMethod; label: string }[]
-              ).map(({ value, label }) => (
-                <View key={value} style={styles.radioRow}>
-                  <RadioButton
-                    value={value}
-                    status={method === value ? 'checked' : 'unchecked'}
-                    onPress={() => setMethod(value)}
-                  />
-                  <Text style={styles.radioLabel} onPress={() => setMethod(value)}>
-                    {label}
-                  </Text>
-                </View>
-              ))}
+              <Text style={styles.paymentHeading}>Chọn phương thức thanh toán</Text>
+              <View style={styles.paymentOptionsRow}>
+                <PaymentOption
+                  label="MoMo"
+                  icon="cellphone"
+                  color="#A93DE6"
+                  selected={method === 'momo'}
+                  onPress={() => setMethod('momo')}
+                />
+                <PaymentOption
+                  label="ZaloPay"
+                  icon="lightning-bolt"
+                  color="#0068FF"
+                  selected={method === 'zalopay'}
+                  onPress={() => setMethod('zalopay')}
+                />
+                <PaymentOption
+                  label="VietQR"
+                  icon="qrcode"
+                  color="#0F8B8D"
+                  selected={method === 'vietqr'}
+                  onPress={() => setMethod('vietqr')}
+                />
+              </View>
             </Card.Content>
-            <Card.Actions>
+            <Card.Actions style={styles.cardActions}>
               <Button
                 mode="contained"
                 onPress={pay}
                 loading={initiatePayment.isPending}
-                style={{ flex: 1, marginHorizontal: spacing.sm }}
+                style={styles.payButton}
+                contentStyle={styles.payButtonContent}
               >
-                Thanh toán {money(invoice.totalAmount)}
+                Thanh Toán
               </Button>
             </Card.Actions>
           </Card>
@@ -180,7 +203,7 @@ export default function InvoiceDetailScreen({ route }: any) {
         {/* VietQR display */}
         {qrData && (
           <Card style={styles.card}>
-            <Card.Title title="Quét mã VietQR để chuyển khoản" />
+            <Card.Title title="Quét mã VietQR để chuyển khoản" titleStyle={styles.cardTitle} />
             <Card.Content style={styles.qrContainer}>
               <Image
                 source={{ uri: qrData.qrCodeUrl }}
@@ -199,10 +222,7 @@ export default function InvoiceDetailScreen({ route }: any) {
               </Text>
               <Button
                 mode="contained-tonal"
-                onPress={() => {
-                  setQrData(null);
-                  refetch();
-                }}
+                onPress={() => { setQrData(null); refetch(); }}
                 style={{ marginTop: spacing.md }}
               >
                 Đã chuyển khoản xong
@@ -215,27 +235,167 @@ export default function InvoiceDetailScreen({ route }: any) {
   );
 }
 
-function Row({ label, value, bold }: { label: string; value?: string; bold?: boolean }) {
+function BillingRow({
+  label,
+  value,
+  bold,
+}: {
+  label: string;
+  value?: string;
+  bold?: boolean;
+}) {
   return (
     <View style={rowStyles.row}>
-      <Text style={rowStyles.label}>{label}</Text>
-      <Text style={[rowStyles.value, bold && rowStyles.bold]}>{value ?? '—'}</Text>
+      <Text style={[rowStyles.label, bold && rowStyles.boldLabel]}>{label}</Text>
+      <Text style={[rowStyles.value, bold && rowStyles.boldValue]}>{value ?? '—'}</Text>
     </View>
   );
 }
 
+function PaymentOption({
+  label,
+  icon,
+  color,
+  selected,
+  onPress,
+}: {
+  label: string;
+  icon: string;
+  color: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        paymentStyles.card,
+        selected && { borderColor: color, backgroundColor: color + '14' },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <MaterialCommunityIcons name={icon as any} size={28} color={color} />
+      <Text style={[paymentStyles.label, selected && { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const rowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  label: { ...typography.body, color: theme.colors.onSurfaceVariant },
-  value: { ...typography.body, maxWidth: '55%', textAlign: 'right' },
-  bold: { fontWeight: '700', color: theme.colors.primary },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs + 2,
+  },
+  label: { ...typography.body, color: theme.colors.onSurfaceVariant, flex: 1 },
+  value: { ...typography.body, textAlign: 'right' },
+  boldLabel: { ...typography.headingSmall, color: theme.colors.onSurface },
+  boldValue: {
+    ...typography.headingSmall,
+    color: theme.colors.primary,
+    textAlign: 'right',
+  },
+});
+
+const paymentStyles = StyleSheet.create({
+  card: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    marginHorizontal: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: theme.colors.surfaceVariant,
+    borderRadius: theme.roundness,
+    gap: spacing.xs,
+  },
+  label: {
+    ...typography.label,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
+  loader: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.md },
 
-  // Return banner
+  subtitle: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+
+  statusRow: {
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    borderRadius: 50,
+  },
+  statusLabel: {
+    ...typography.headingSmall,
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+
+  card: {
+    borderRadius: theme.roundness,
+    backgroundColor: theme.colors.surface,
+  },
+  cardTitle: { ...typography.headingSmall },
+  cardActions: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+
+  divider: {
+    marginVertical: spacing.sm,
+    backgroundColor: theme.colors.surfaceVariant,
+  },
+
+  dueDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  dueDateText: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+  },
+
+  paidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#D5F5E3',
+    borderRadius: theme.roundness,
+    padding: spacing.md,
+  },
+  paidText: {
+    ...typography.body,
+    color: '#1E8449',
+    flex: 1,
+  },
+
+  paymentHeading: {
+    ...typography.headingSmall,
+    color: theme.colors.onSurface,
+    marginBottom: spacing.md,
+  },
+  paymentOptionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  payButton: {
+    flex: 1,
+    borderRadius: theme.roundness,
+  },
+  payButtonContent: {
+    paddingVertical: spacing.xs,
+  },
+
   returnBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -245,24 +405,8 @@ const styles = StyleSheet.create({
   returnIcon: { fontSize: 20 },
   returnText: { ...typography.body, flex: 1 },
 
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: { ...typography.headingLarge },
-  card: { borderRadius: 12 },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.surfaceVariant,
-    marginVertical: spacing.sm,
-  },
-  radioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
-  radioLabel: { ...typography.body, flex: 1 },
-
-  // VietQR
   qrContainer: { alignItems: 'center', paddingVertical: spacing.md },
-  qrImage: { width: 220, height: 220, borderRadius: 8 },
+  qrImage: { width: 220, height: 220, borderRadius: spacing.sm },
   qrAmount: {
     ...typography.headingMedium,
     color: theme.colors.primary,
@@ -271,7 +415,7 @@ const styles = StyleSheet.create({
   transferRefBox: {
     marginTop: spacing.sm,
     backgroundColor: theme.colors.surfaceVariant,
-    borderRadius: 8,
+    borderRadius: spacing.sm,
     padding: spacing.sm,
     alignItems: 'center',
     width: '100%',

@@ -1,27 +1,60 @@
 import React, { useState, useMemo } from 'react';
-import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
-import { Text, Card, Chip, ActivityIndicator, Searchbar } from 'react-native-paper';
+import {
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  ActivityIndicator,
+  IconButton,
+  Text,
+} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/vi';
 import { api } from '../../api/client';
 import { theme, spacing, typography } from '../../theme';
 
-const STATUS_FILTERS = [
-  { label: 'Tất cả', value: '' },
-  { label: 'Chờ xử lý', value: 'pending' },
-  { label: 'Đang xử lý', value: 'in_progress' },
-  { label: 'Hoàn thành', value: 'done' },
-];
+dayjs.extend(relativeTime);
+dayjs.locale('vi');
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
-  high: { label: 'Cao', color: '#E74C3C' },
-  medium: { label: 'Trung bình', color: '#E67E22' },
-  low: { label: 'Thấp', color: '#27AE60' },
+const ACTIVE_STATUSES = ['pending', 'in_progress'];
+const HISTORY_STATUSES = ['completed', 'rejected'];
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  pending:     { label: 'Chờ xử lý',  color: '#E67E22', bg: '#FEF3E2' },
+  in_progress: { label: 'Đang xử lý', color: '#2980B9', bg: '#EBF5FB' },
+  completed:   { label: 'Hoàn thành', color: '#27AE60', bg: '#EAFAF1' },
+  rejected:    { label: 'Từ chối',    color: '#C0392B', bg: '#FDEDEC' },
 };
 
+const CATEGORY_ICON: Record<string, string> = {
+  plumbing:    'pipe',
+  electrical:  'flash',
+  hvac:        'air-conditioner',
+  structural:  'office-building',
+  appliance:   'washing-machine',
+  default:     'tools',
+};
+
+const ICON_BG: string[] = [
+  '#D6EAF8', '#FDEBD0', '#D5F5E3', '#FCF3CF', '#F9EBEA',
+];
+
+function getCategoryIcon(category?: string): string {
+  return CATEGORY_ICON[category ?? 'default'] ?? CATEGORY_ICON.default;
+}
+
+function getIconBg(index: number): string {
+  return ICON_BG[index % ICON_BG.length];
+}
+
 export default function MaintenanceListScreen({ navigation }: any) {
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['maintenance'],
@@ -30,52 +63,45 @@ export default function MaintenanceListScreen({ navigation }: any) {
 
   const filtered = useMemo(() => {
     const list: any[] = data ?? [];
-    return list
-      .filter((item) => (statusFilter ? item.status === statusFilter : true))
-      .filter((item) => {
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.toLowerCase();
-        return (
-          item.title?.toLowerCase().includes(q) ||
-          item.description?.toLowerCase().includes(q)
-        );
-      });
-  }, [data, statusFilter, searchQuery]);
+    const allowed = activeTab === 'active' ? ACTIVE_STATUSES : HISTORY_STATUSES;
+    return list.filter((item) => allowed.includes(item.status));
+  }, [data, activeTab]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <Searchbar
-        placeholder="Tìm kiếm yêu cầu bảo trì..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        style={styles.searchbar}
-        inputStyle={styles.searchInput}
-      />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Yêu cầu bảo trì</Text>
+        <IconButton
+          icon="bell-outline"
+          size={24}
+          iconColor={theme.colors.primary}
+          onPress={() => navigation.navigate('Notifications')}
+        />
+      </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        {STATUS_FILTERS.map((f) => (
-          <Chip
-            key={f.value}
-            selected={statusFilter === f.value}
-            mode={statusFilter === f.value ? 'flat' : 'outlined'}
-            onPress={() => setStatusFilter(f.value)}
-            style={[
-              styles.filterChip,
-              statusFilter === f.value && styles.filterChipActive,
-            ]}
-            textStyle={statusFilter === f.value ? styles.filterChipActiveText : undefined}
-          >
-            {f.label}
-          </Chip>
-        ))}
-      </ScrollView>
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+          onPress={() => setActiveTab('active')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
+            Đang xử lý
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+          onPress={() => setActiveTab('history')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+            Lịch sử
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} />
+        <ActivityIndicator style={styles.loader} color={theme.colors.primary} />
       ) : (
         <FlatList
           data={filtered}
@@ -83,34 +109,48 @@ export default function MaintenanceListScreen({ navigation }: any) {
           contentContainerStyle={styles.list}
           onRefresh={refetch}
           refreshing={isLoading}
-          renderItem={({ item }) => {
-            const priority = PRIORITY_CONFIG[item.priority] ?? null;
+          renderItem={({ item, index }) => {
+            const statusCfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pending;
+            const icon = getCategoryIcon(item.category);
+            const iconBg = getIconBg(index);
+            const timeAgo = dayjs(item.createdAt).fromNow();
+            const roomNum = item.room?.roomNumber ?? '';
+            const code = item.code ? `#${item.code}` : '';
+
             return (
-              <Card style={styles.card} onPress={() => navigation.navigate('MaintenanceDetail', { id: item.id })}>
-                <Card.Content>
-                  <View style={styles.row}>
-                    <Text style={styles.title}>{item.title}</Text>
-                    <Chip compact>{item.status}</Chip>
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => navigation.navigate('MaintenanceDetail', { id: item.id })}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
+                  <MaterialCommunityIcons name={icon as any} size={22} color={theme.colors.primary} />
+                </View>
+
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.cardSub} numberOfLines={1}>
+                    {roomNum ? `Phòng ${roomNum}` : ''}
+                    {roomNum && code ? ' · ' : ''}
+                    {code}
+                  </Text>
+                </View>
+
+                <View style={styles.cardRight}>
+                  <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
+                    <Text style={[styles.statusText, { color: statusCfg.color }]}>
+                      {statusCfg.label}
+                    </Text>
                   </View>
-                  <View style={styles.metaRow}>
-                    <Text style={styles.desc}>{item.room?.roomNumber}</Text>
-                    {priority && (
-                      <Chip
-                        compact
-                        style={[styles.priorityChip, { backgroundColor: priority.color + '22' }]}
-                        textStyle={[styles.priorityText, { color: priority.color }]}
-                      >
-                        {priority.label}
-                      </Chip>
-                    )}
-                  </View>
-                </Card.Content>
-              </Card>
+                  <Text style={styles.timeText}>{timeAgo}</Text>
+                </View>
+              </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>Không có yêu cầu bảo trì nào</Text>
+              <MaterialCommunityIcons name="wrench" size={56} color={theme.colors.onSurfaceVariant} />
+              <Text style={styles.emptyText}>Không có yêu cầu bảo trì</Text>
             </View>
           }
         />
@@ -120,32 +160,112 @@ export default function MaintenanceListScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  searchbar: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    borderRadius: 10,
-    backgroundColor: theme.colors.surface,
-    elevation: 1,
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
-  searchInput: { ...typography.body },
-  chipRow: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  headerTitle: {
+    ...typography.headingMedium,
+    color: theme.colors.primary,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: theme.colors.surfaceVariant,
+    borderRadius: 24,
+    padding: 3,
+  },
+  tab: {
+    flex: 1,
     paddingVertical: spacing.sm,
+    alignItems: 'center',
+    borderRadius: 22,
+  },
+  tabActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  tabText: {
+    ...typography.label,
+    fontWeight: '600',
+    color: theme.colors.onSurfaceVariant,
+  },
+  tabTextActive: {
+    color: theme.colors.onPrimary,
+  },
+  loader: {
+    flex: 1,
+    marginTop: spacing.xl,
+  },
+  list: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.roundness,
+    padding: spacing.md,
+    gap: spacing.sm,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBody: {
+    flex: 1,
     gap: spacing.xs,
   },
-  filterChip: { borderRadius: 20 },
-  filterChipActive: { backgroundColor: theme.colors.primary },
-  filterChipActiveText: { color: theme.colors.onPrimary },
-  loader: { flex: 1, marginTop: spacing.xl },
-  list: { padding: spacing.md, gap: spacing.sm },
-  card: { borderRadius: 12 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
-  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { ...typography.headingSmall, flex: 1 },
-  desc: { ...typography.body, color: theme.colors.onSurfaceVariant, flex: 1 },
-  priorityChip: { borderRadius: 12 },
-  priorityText: { ...typography.label, fontWeight: '600' },
-  empty: { alignItems: 'center', marginTop: spacing.xxl },
-  emptyText: { ...typography.body, color: theme.colors.onSurfaceVariant },
+  cardTitle: {
+    ...typography.headingSmall,
+    color: theme.colors.onSurface,
+  },
+  cardSub: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+  },
+  cardRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusText: {
+    ...typography.label,
+    fontWeight: '600',
+  },
+  timeText: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+  },
+  empty: {
+    alignItems: 'center',
+    marginTop: spacing.xxl,
+    gap: spacing.md,
+  },
+  emptyText: {
+    ...typography.body,
+    color: theme.colors.onSurfaceVariant,
+  },
 });

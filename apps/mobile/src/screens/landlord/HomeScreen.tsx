@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
 import { Text, ActivityIndicator, Avatar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -192,6 +192,73 @@ export default function LandlordHomeScreen({ navigation }: any) {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Property cards */}
+        <View style={styles.propertiesSection}>
+          <View style={styles.propertiesHeader}>
+            <Text style={styles.propertiesTitle}>Bất động sản của bạn</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Properties')}>
+              <Text style={styles.viewAllLink}>Xem tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.propertyCardsRow}
+          >
+            {isLoading ? (
+              <ActivityIndicator style={{ marginVertical: spacing.md }} />
+            ) : items.length === 0 ? (
+              <Text style={styles.emptyText}>Chưa có bất động sản nào</Text>
+            ) : (
+              items.map((property: any) => {
+                const total = property._count?.rooms ?? 0;
+                const occupied = property._count?.occupiedRooms ?? 0;
+                const pct = total > 0 ? Math.round((occupied / total) * 100) : 0;
+                const coverImg = property.imageUrls?.[0] ?? property.coverImage ?? null;
+                return (
+                  <TouchableOpacity
+                    key={property.id}
+                    style={styles.propertyCard}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('PropertyDetail', { id: property.id })}
+                  >
+                    {coverImg ? (
+                      <Image
+                        source={{ uri: coverImg }}
+                        style={styles.propertyCardImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.propertyCardImage, styles.propertyCardImagePlaceholder]}>
+                        <MaterialCommunityIcons
+                          name="office-building"
+                          size={36}
+                          color={theme.colors.primary}
+                        />
+                      </View>
+                    )}
+                    <View style={styles.propertyCardBody}>
+                      <Text style={styles.propertyCardName} numberOfLines={1}>
+                        {property.name}
+                      </Text>
+                      <Text style={styles.propertyCardAddress} numberOfLines={1}>
+                        {[property.district, property.city].filter(Boolean).join(', ') || property.address}
+                      </Text>
+                      <Text style={styles.propertyCardRooms}>
+                        {`🏠 ${total} phòng · ${occupied}/${total}`}
+                      </Text>
+                      <Text style={[styles.propertyCardOccupancy, { color: theme.colors.secondary }]}>
+                        {`Lấp đầy ${pct}%`}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -318,4 +385,64 @@ const styles = StyleSheet.create({
   actionIcon: { fontSize: 16, marginRight: spacing.sm },
   actionText: { ...typography.body, color: theme.colors.onSurface, flex: 1 },
   rowDivider: { height: 1, backgroundColor: theme.colors.surfaceVariant, marginLeft: spacing.md },
+
+  propertiesSection: {
+    marginTop: spacing.lg,
+  },
+  propertiesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  propertiesTitle: { ...typography.headingSmall, color: theme.colors.onSurface },
+  viewAllLink: { ...typography.body, color: theme.colors.primary, fontWeight: '600' },
+  propertyCardsRow: { gap: 0, paddingRight: spacing.lg },
+  emptyText: { ...typography.body, color: theme.colors.onSurfaceVariant },
+
+  propertyCard: {
+    width: 190,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
+    marginRight: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  propertyCardImage: {
+    width: '100%',
+    height: 120,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  propertyCardImagePlaceholder: {
+    backgroundColor: theme.colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyCardBody: {
+    padding: spacing.sm,
+  },
+  propertyCardName: {
+    ...typography.headingSmall,
+    color: theme.colors.onSurface,
+    marginBottom: 2,
+  },
+  propertyCardAddress: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+    marginBottom: spacing.xs,
+  },
+  propertyCardRooms: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+    marginBottom: 2,
+  },
+  propertyCardOccupancy: {
+    ...typography.bodySmall,
+    fontWeight: '600',
+  },
 });

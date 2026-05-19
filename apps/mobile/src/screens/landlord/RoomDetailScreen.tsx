@@ -1,22 +1,56 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View, Image, Dimensions } from 'react-native';
-import { Text, Card, Chip, Button, Divider, ActivityIndicator, IconButton } from 'react-native-paper';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Image,
+  Dimensions,
+  TouchableOpacity,
+  Linking,
+} from 'react-native';
+import {
+  Text,
+  Chip,
+  Button,
+  ActivityIndicator,
+  IconButton,
+  Divider,
+} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { useProperty } from '../../queries/properties';
 import { theme, spacing, typography } from '../../theme';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const HERO_HEIGHT = Math.round(SCREEN_WIDTH * (9 / 16));
+const PLACEHOLDER = 'https://placehold.co/600x300/1B4F72/white?text=Phong';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  trong: { label: 'Trống', color: '#27AE60', icon: 'check-circle' },
-  da_thue: { label: 'Đã thuê', color: theme.colors.primary, icon: 'account-check' },
-  dang_sua_chua: { label: 'Đang sửa chữa', color: theme.colors.secondary, icon: 'wrench' },
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  trong: { label: 'Trống', color: '#27AE60' },
+  da_thue: { label: 'Đang thuê', color: theme.colors.primary },
+  dang_sua_chua: { label: 'Đang sửa chữa', color: theme.colors.secondary },
 };
 
-function useRoom(propertyId: string, roomId: string) {
+const AMENITY_ICONS: Record<string, string> = {
+  wifi: 'wifi',
+  dieu_hoa: 'air-conditioner',
+  'Điều hòa': 'air-conditioner',
+  'WiFi': 'wifi',
+  'Nóng lạnh': 'water-boiler',
+  'Ban công': 'balcony',
+  may_lanh: 'air-conditioner',
+  nuoc_nong: 'water-boiler',
+  ban_cong: 'balcony',
+  tu_lanh: 'fridge',
+  may_giat: 'washing-machine',
+  bep: 'stove',
+};
+
+function useRoom(roomId: string) {
   return useQuery({
-    queryKey: ['rooms', propertyId, roomId],
+    queryKey: ['rooms', roomId],
     queryFn: () => api.get(`/rooms/${roomId}`).then((r) => r.data),
     enabled: !!roomId,
   });
@@ -24,220 +58,345 @@ function useRoom(propertyId: string, roomId: string) {
 
 export default function RoomDetailScreen({ route, navigation }: any) {
   const { id, propertyId } = route.params;
-  const { data: room, isLoading } = useRoom(propertyId, id);
+  const { data: room, isLoading: loadingRoom } = useRoom(id);
+  const { data: property } = useProperty(propertyId ?? room?.propertyId ?? '');
 
-  if (isLoading) return <ActivityIndicator style={{ flex: 1 }} />;
+  if (loadingRoom) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ flex: 1 }} />
+      </SafeAreaView>
+    );
+  }
   if (!room) return null;
 
-  const statusInfo = STATUS_CONFIG[room.status] ?? { label: room.status, color: '#888', icon: 'help-circle' };
+  const statusInfo = STATUS_CONFIG[room.status] ?? { label: room.status, color: '#888' };
+  const isOccupied = room.status === 'da_thue';
+  const isVacant = room.status === 'trong';
+  const heroImage = room.imageUrls?.[0] ?? PLACEHOLDER;
+
+  const formattedRent = room.baseRent
+    ? room.baseRent.toLocaleString('vi-VN') + ' ₫/tháng'
+    : '—';
+
+  const amenities: string[] = room.amenities ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Room Images */}
-        {room.imageUrls?.length > 0 && (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.imageScroller}
-          >
-            {room.imageUrls.map((url: string, i: number) => (
-              <Image
-                key={i}
-                source={{ uri: url }}
-                style={styles.roomImage}
-                resizeMode="cover"
-              />
-            ))}
-          </ScrollView>
-        )}
+      {/* Custom header */}
+      <View style={styles.topBar}>
+        <IconButton
+          icon="arrow-left"
+          size={24}
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+        />
+        <Text style={styles.topBarTitle}>Chi tiết phòng</Text>
+        <IconButton
+          icon="dots-vertical"
+          size={24}
+          style={styles.menuBtn}
+          onPress={() => {}}
+        />
+      </View>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.title}>Phòng {room.roomNumber}</Text>
-            {room.floor && <Text style={styles.subtitle}>Tầng {room.floor}</Text>}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero image */}
+        <Image
+          source={{ uri: heroImage }}
+          style={styles.heroImage}
+          resizeMode="cover"
+        />
+
+        {/* Room info card */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardRow}>
+            <Text style={styles.roomName}>Phòng {room.roomNumber}</Text>
+            <Chip
+              style={[styles.statusBadge, { backgroundColor: statusInfo.color + '22' }]}
+              textStyle={[styles.statusText, { color: statusInfo.color }]}
+              compact
+            >
+              {statusInfo.label}
+            </Chip>
           </View>
-          <Chip
-            icon={statusInfo.icon}
-            style={{ backgroundColor: statusInfo.color + '20' }}
-            textStyle={{ color: statusInfo.color, fontWeight: '600' }}
-          >
-            {statusInfo.label}
-          </Chip>
-        </View>
 
-        {/* Key Info Cards */}
-        <View style={styles.infoRow}>
-          <Card style={styles.infoCard}>
-            <Card.Content style={styles.infoCardContent}>
-              <IconButton icon="ruler-square" size={20} iconColor={theme.colors.primary} style={styles.infoIcon} />
-              <Text style={styles.infoValue}>{room.area} m²</Text>
-              <Text style={styles.infoLabel}>Diện tích</Text>
-            </Card.Content>
-          </Card>
-          <Card style={styles.infoCard}>
-            <Card.Content style={styles.infoCardContent}>
-              <IconButton icon="cash" size={20} iconColor={theme.colors.secondary} style={styles.infoIcon} />
-              <Text style={styles.infoValue}>{room.baseRent?.toLocaleString('vi-VN')}</Text>
-              <Text style={styles.infoLabel}>VND/tháng</Text>
-            </Card.Content>
-          </Card>
-          <Card style={styles.infoCard}>
-            <Card.Content style={styles.infoCardContent}>
-              <IconButton icon="account-group" size={20} iconColor="#8E44AD" style={styles.infoIcon} />
-              <Text style={styles.infoValue}>{room.maxOccupants}</Text>
-              <Text style={styles.infoLabel}>Tối đa</Text>
-            </Card.Content>
-          </Card>
+          <View style={styles.detailRow}>
+            <MaterialCommunityIcons
+              name="cash"
+              size={18}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text style={styles.detailText}>{formattedRent}</Text>
+          </View>
+
+          {room.area ? (
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons
+                name="ruler-square"
+                size={18}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text style={styles.detailText}>{room.area} m²</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Amenities */}
-        {room.amenities?.length > 0 && (
-          <>
-            <Divider style={styles.divider} />
+        {amenities.length > 0 && (
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tiện nghi</Text>
-            <View style={styles.amenitiesWrap}>
-              {room.amenities.map((amenity: string, i: number) => (
-                <Chip key={i} style={styles.amenityChip} compact>
-                  {amenity}
-                </Chip>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.amenitiesRow}
+            >
+              {amenities.map((item: string, i: number) => (
+                <View key={i} style={styles.amenityChip}>
+                  <MaterialCommunityIcons
+                    name={(AMENITY_ICONS[item] ?? 'check-circle') as any}
+                    size={16}
+                    color={theme.colors.primary}
+                  />
+                  <Text style={styles.amenityLabel}>{item}</Text>
+                </View>
               ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Tenant section */}
+        {isOccupied && room.tenant && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Người thuê</Text>
+            <View style={styles.tenantCard}>
+              <View style={styles.tenantAvatar}>
+                {room.tenant.avatarUrl ? (
+                  <Image source={{ uri: room.tenant.avatarUrl }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarInitial}>
+                      {(room.tenant.fullName ?? '?')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.tenantInfo}>
+                <Text style={styles.tenantName}>{room.tenant.fullName ?? '—'}</Text>
+                <Text style={styles.tenantPhone}>{room.tenant.phone ?? ''}</Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('ContractDetail', { contractId: room.currentContractId })
+                  }
+                >
+                  <Text style={styles.contractLink}>Xem hợp đồng</Text>
+                </TouchableOpacity>
+              </View>
+              {room.tenant.phone ? (
+                <IconButton
+                  icon="phone"
+                  size={22}
+                  iconColor={theme.colors.primary}
+                  style={styles.phoneBtn}
+                  onPress={() => Linking.openURL(`tel:${room.tenant.phone}`)}
+                />
+              ) : null}
             </View>
-          </>
+          </View>
         )}
 
         {/* Notes */}
-        {room.notes && (
-          <>
-            <Divider style={styles.divider} />
+        {room.notes ? (
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ghi chú</Text>
             <Text style={styles.notes}>{room.notes}</Text>
-          </>
-        )}
+          </View>
+        ) : null}
 
-        <Divider style={styles.divider} />
+        {/* Spacer for sticky footer */}
+        <View style={{ height: 90 }} />
+      </ScrollView>
 
-        {/* Actions */}
-        <Text style={styles.sectionTitle}>Thao tác</Text>
-
-        {room.status === 'trong' && (
+      {/* Sticky action buttons */}
+      <View style={styles.stickyFooter}>
+        {isVacant && (
           <Button
             mode="contained"
-            icon="file-sign"
-            onPress={() => navigation.navigate('CreateContract')}
-            style={styles.actionButton}
-            contentStyle={styles.actionContent}
+            style={styles.fullBtn}
+            contentStyle={styles.btnContent}
+            onPress={() =>
+              navigation.navigate('CreateContract', { propertyId, roomId: id })
+            }
           >
-            Tạo hợp đồng mới
+            Tạo Hợp Đồng
           </Button>
         )}
-
-        {room.status === 'da_thue' && room.currentContractId && (
-          <>
+        {isOccupied && (
+          <View style={styles.footerRow}>
+            <Button
+              mode="outlined"
+              style={[styles.halfBtn, { marginRight: spacing.sm }]}
+              contentStyle={styles.btnContent}
+              onPress={() => navigation.navigate('CreateRoom', { propertyId, roomId: id })}
+            >
+              Chỉnh Sửa Phòng
+            </Button>
             <Button
               mode="contained"
-              icon="file-document"
+              style={styles.halfBtn}
+              contentStyle={styles.btnContent}
               onPress={() =>
-                navigation.navigate('ContractDetail', { id: room.currentContractId })
+                navigation.navigate('ContractDetail', { contractId: room.currentContractId })
               }
-              style={styles.actionButton}
-              contentStyle={styles.actionContent}
             >
-              Xem hợp đồng
+              Xem Hợp Đồng
             </Button>
-            <Button
-              mode="contained-tonal"
-              icon="receipt"
-              onPress={() =>
-                navigation.navigate('InvoiceList', { contractId: room.currentContractId, roomId: room.id })
-              }
-              style={styles.actionButton}
-              contentStyle={styles.actionContent}
-            >
-              Danh sách hóa đơn
-            </Button>
-            <Button
-              mode="contained-tonal"
-              icon="cash-lock"
-              onPress={() =>
-                navigation.navigate('DepositDetail', { contractId: room.currentContractId })
-              }
-              style={styles.actionButton}
-              contentStyle={styles.actionContent}
-            >
-              Quản lý tiền cọc
-            </Button>
-            <Button
-              mode="contained-tonal"
-              icon="clipboard-check"
-              onPress={() =>
-                navigation.navigate('CreateChecklist', {
-                  contractId: room.currentContractId,
-                  phase: 'ban_giao',
-                })
-              }
-              style={styles.actionButton}
-              contentStyle={styles.actionContent}
-            >
-              Tạo biên bản bàn giao
-            </Button>
-          </>
+          </View>
         )}
-
-        <Button
-          mode="outlined"
-          icon="wrench"
-          onPress={() =>
-            navigation.navigate('MaintenanceDetail', { id: room.id })
-          }
-          style={styles.actionButton}
-          contentStyle={styles.actionContent}
-        >
-          Yêu cầu bảo trì
-        </Button>
-      </ScrollView>
+        {!isVacant && !isOccupied && (
+          <Button
+            mode="outlined"
+            style={styles.fullBtn}
+            contentStyle={styles.btnContent}
+            onPress={() => navigation.navigate('CreateRoom', { propertyId, roomId: id })}
+          >
+            Chỉnh Sửa Phòng
+          </Button>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { paddingBottom: spacing.xxl },
-  imageScroller: { marginBottom: spacing.md },
-  roomImage: {
-    width: SCREEN_WIDTH - spacing.lg * 2,
-    height: 220,
-    borderRadius: 12,
-    marginHorizontal: spacing.lg,
+  content: { paddingBottom: spacing.md },
+
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.surfaceVariant,
   },
-  header: {
+  backBtn: { margin: 0 },
+  menuBtn: { margin: 0 },
+  topBarTitle: {
+    flex: 1,
+    ...typography.headingSmall,
+    color: theme.colors.onSurface,
+    textAlign: 'center',
+  },
+
+  heroImage: {
+    width: SCREEN_WIDTH,
+    height: HERO_HEIGHT,
+  },
+
+  infoCard: {
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: spacing.md,
+    marginTop: -spacing.lg,
+    borderRadius: 12,
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: spacing.md,
+  },
+  infoCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  headerLeft: {},
-  title: { ...typography.headingLarge },
-  subtitle: { ...typography.body, color: theme.colors.onSurfaceVariant, marginTop: 2 },
-  infoRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  infoCard: { flex: 1, borderRadius: 12 },
-  infoCardContent: { alignItems: 'center', paddingVertical: spacing.sm },
-  infoIcon: { margin: 0 },
-  infoValue: { ...typography.headingSmall, textAlign: 'center' },
-  infoLabel: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, textAlign: 'center' },
-  divider: { marginVertical: spacing.md, marginHorizontal: spacing.lg },
-  sectionTitle: { ...typography.headingSmall, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
-  amenitiesWrap: {
+  roomName: { ...typography.headingLarge, color: theme.colors.onSurface, flex: 1 },
+  statusBadge: { borderRadius: 20, marginLeft: spacing.sm },
+  statusText: { ...typography.label, fontWeight: '600' },
+  detailRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xs,
   },
-  amenityChip: { borderRadius: 20 },
-  notes: { ...typography.body, color: theme.colors.onSurfaceVariant, paddingHorizontal: spacing.lg },
-  actionButton: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 12 },
-  actionContent: { paddingVertical: spacing.xs },
+  detailText: { ...typography.body, color: theme.colors.onSurfaceVariant },
+
+  section: {
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    ...typography.headingSmall,
+    color: theme.colors.onSurface,
+    marginBottom: spacing.sm,
+  },
+
+  amenitiesRow: { gap: spacing.sm, paddingVertical: spacing.xs },
+  amenityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: theme.colors.primaryContainer,
+    borderRadius: 20,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  amenityLabel: { ...typography.bodySmall, color: theme.colors.primary, fontWeight: '500' },
+
+  tenantCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tenantAvatar: { marginRight: spacing.sm },
+  avatarImg: { width: 48, height: 48, borderRadius: 24 },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: { ...typography.headingSmall, color: theme.colors.primary },
+  tenantInfo: { flex: 1 },
+  tenantName: { ...typography.headingSmall, color: theme.colors.onSurface },
+  tenantPhone: { ...typography.bodySmall, color: theme.colors.onSurfaceVariant, marginTop: 2 },
+  contractLink: {
+    ...typography.bodySmall,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  phoneBtn: { margin: 0 },
+
+  notes: { ...typography.body, color: theme.colors.onSurfaceVariant },
+
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.surfaceVariant,
+    padding: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  fullBtn: { borderRadius: 12 },
+  halfBtn: { flex: 1, borderRadius: 12 },
+  btnContent: { paddingVertical: spacing.xs },
+  footerRow: { flexDirection: 'row' },
 });
