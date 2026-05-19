@@ -1,9 +1,30 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { getMockResponse } from './mock-data';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/v1';
 
 export const api = axios.create({ baseURL: BASE_URL });
+
+const MOCK_MODE = !!process.env.EXPO_PUBLIC_MOCK_AUTH;
+
+if (MOCK_MODE) {
+  api.interceptors.request.use((config) => {
+    config.adapter = async (cfg: typeof config) => {
+      await new Promise((r) => setTimeout(r, 300));
+      const data = getMockResponse(cfg.url ?? '', cfg.method);
+      return {
+        data,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: cfg,
+        request: {},
+      };
+    };
+    return config;
+  });
+}
 
 api.interceptors.request.use(async (config) => {
   const token = await SecureStore.getItemAsync('access_token');
